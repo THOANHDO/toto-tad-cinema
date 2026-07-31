@@ -1,23 +1,22 @@
 import Link from "next/link";
-import { Home, Film } from "lucide-react";
+import { Compass, Film } from "lucide-react";
 
 export default function NotFound() {
     return (
-        <div className="min-h-[60vh] flex items-center justify-center px-4">
-            <div className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-6">
-                    <Film className="w-16 h-16 text-primary" />
+        <div className="flex min-h-[78vh] items-center justify-center px-4 pb-16 pt-24">
+            <div className="max-w-md text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-background-secondary text-primary">
+                    <Film className="h-7 w-7" />
                 </div>
-                <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
-                <h2 className="text-2xl font-semibold mb-2">Không tìm thấy trang</h2>
-                <p className="text-foreground-secondary mb-8">
-                    Trang bạn đang tìm kiếm không tồn tại hoặc đã bị xóa.
+                <p className="eyebrow mt-6">Lỗi 404</p>
+                <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-white sm:text-4xl">
+                    Không tìm thấy trang
+                </h1>
+                <p className="mt-3 text-sm leading-6 text-foreground-secondary">
+                    Đường dẫn có thể đã thay đổi hoặc nội dung không còn khả dụng.
                 </p>
-                <Link
-                    href="/"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-hover text-white font-semibold rounded-lg transition-colors"
-                >
-                    <Home className="w-5 h-5" />
+                <Link href="/" className="button-primary mt-7">
+                    <Compass className="h-4 w-4" />
                     Về trang chủ
                 </Link>
             </div>

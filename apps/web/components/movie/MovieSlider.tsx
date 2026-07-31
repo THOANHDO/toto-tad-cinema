@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef } from "react";
-import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import MovieCard from "./MovieCard";
@@ -19,7 +18,7 @@ export default function MovieSlider({ title, movies, href, showProgress = true }
 
     const scroll = (direction: "left" | "right") => {
         if (sliderRef.current) {
-            const scrollAmount = sliderRef.current.offsetWidth * 0.8;
+            const scrollAmount = sliderRef.current.offsetWidth * 0.82;
             sliderRef.current.scrollBy({
                 left: direction === "left" ? -scrollAmount : scrollAmount,
                 behavior: "smooth",
@@ -27,51 +26,56 @@ export default function MovieSlider({ title, movies, href, showProgress = true }
         }
     };
 
+    if (!movies || movies.length === 0) return null;
+
     return (
-        <section className="py-6 md:py-8 relative group/section">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4 md:mb-6">
-                <h2 className="text-xl md:text-2xl font-bold">{title}</h2>
+        <section className="group/section relative py-7 md:py-8 lg:py-9" aria-labelledby={`section-${href ?? title}`}>
+            <div className="mb-4 flex items-end justify-between gap-4 md:mb-5">
+                <h2
+                    id={`section-${href ?? title}`}
+                    className="text-xl font-bold tracking-[-0.03em] text-foreground md:text-2xl"
+                >
+                    {title}
+                </h2>
                 {href && (
                     <Link
                         href={href}
                         prefetch={false}
-                        className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover transition-colors group"
+                        className="group/link flex flex-none items-center gap-1 text-xs font-semibold text-foreground-secondary transition-colors hover:text-white sm:text-sm"
                     >
                         Xem tất cả
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="h-4 w-4 text-primary transition-transform group-hover/link:translate-x-0.5" />
                     </Link>
                 )}
             </div>
 
-            {/* Slider container */}
             <div className="relative">
-                {/* Navigation buttons */}
                 <button
+                    type="button"
                     onClick={() => scroll("left")}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-background-secondary/90 hover:bg-primary rounded-full flex items-center justify-center opacity-0 group-hover/section:opacity-100 transition-all -translate-x-1/2 hidden md:flex"
-                    aria-label="Scroll left"
+                    className="absolute left-2 top-[42%] z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/75 text-white opacity-0 shadow-xl backdrop-blur-md transition-[opacity,background-color,border-color] hover:border-white/20 hover:bg-black/90 group-hover/section:opacity-100 group-focus-within/section:opacity-100 xl:flex"
+                    aria-label={`Cuộn ${title} sang trái`}
                 >
-                    <ChevronLeft className="w-5 h-5" />
+                    <ChevronLeft className="h-5 w-5" />
                 </button>
 
                 <button
+                    type="button"
                     onClick={() => scroll("right")}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-background-secondary/90 hover:bg-primary rounded-full flex items-center justify-center opacity-0 group-hover/section:opacity-100 transition-all translate-x-1/2 hidden md:flex"
-                    aria-label="Scroll right"
+                    className="absolute right-2 top-[42%] z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/75 text-white opacity-0 shadow-xl backdrop-blur-md transition-[opacity,background-color,border-color] hover:border-white/20 hover:bg-black/90 group-hover/section:opacity-100 group-focus-within/section:opacity-100 xl:flex"
+                    aria-label={`Cuộn ${title} sang phải`}
                 >
-                    <ChevronRight className="w-5 h-5" />
+                    <ChevronRight className="h-5 w-5" />
                 </button>
 
-                {/* Movies slider */}
                 <div
                     ref={sliderRef}
-                    className="flex gap-4 overflow-x-auto hide-scrollbar scroll-smooth pb-4"
+                    className="hide-scrollbar -mx-[var(--page-gutter)] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[var(--page-gutter)] pb-3 scroll-px-[var(--page-gutter)] sm:gap-4 md:mx-0 md:px-0 md:scroll-px-0 lg:gap-4 xl:gap-5 xl:snap-proximity"
                 >
                     {movies.map((movie, index) => (
                         <div
                             key={movie._id || movie.slug}
-                            className="flex-shrink-0 w-[calc(50%-8px)] sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)] lg:w-[calc(20%-13px)] xl:w-[calc(16.666%-13px)]"
+                            className="w-[42vw] max-w-[12.25rem] flex-none snap-start min-[520px]:w-[30vw] sm:w-[27vw] md:w-[29vw] md:max-w-none lg:w-[22vw] xl:w-[calc((100%-6.25rem)/6)]"
                         >
                             <MovieCard movie={movie} index={index} showProgress={showProgress} />
                         </div>

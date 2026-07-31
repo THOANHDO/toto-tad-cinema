@@ -1,163 +1,217 @@
-import { Metadata } from "next";
-import { getCategories, getCountries, movieTypes, advancedSearch } from "@/lib/api/ophim";
-import MovieGrid from "@/components/movie/MovieGrid";
-import Pagination from "@/components/ui/Pagination";
+import type { Metadata } from "next";
+import { AlertTriangle, Search, SearchX } from "lucide-react";
 import AdvancedSearchForm from "@/components/search/AdvancedSearchForm";
+import MovieGrid from "@/components/movie/MovieGrid";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
+import Pagination from "@/components/ui/Pagination";
+import { advancedSearch, getCategories, getCountries, movieTypes } from "@/lib/api/ophim";
+
+type QueryValue = string | string[] | undefined;
 
 interface Props {
     searchParams: Promise<{
-        q?: string;
-        genre?: string;
-        country?: string;
-        type?: string;
-        year?: string;
-        page?: string;
-        limit?: string;
+        q?: QueryValue;
+        category?: QueryValue;
+        genre?: QueryValue;
+        country?: QueryValue;
+        type?: QueryValue;
+        year?: QueryValue;
+        page?: QueryValue;
+        limit?: QueryValue;
     }>;
 }
 
+interface Option {
+    name: string;
+    slug: string;
+}
+
+interface PaginationData {
+    pageRanges?: number;
+    currentPage?: number;
+    totalItems?: number;
+    totalItemsPerPage?: number;
+}
+
+const readSingleValue = (value: QueryValue) => {
+    const rawValue = Array.isArray(value) ? value[0] : value;
+    return rawValue?.split(",")[0]?.trim() || "";
+};
+
+const readPositiveInteger = (value: QueryValue, fallback: number) => {
+    const parsedValue = Number.parseInt(readSingleValue(value), 10);
+    return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
+};
+
+const getOptionName = (options: Option[], slug: string) =>
+    options.find((option) => option.slug === slug)?.name || slug;
+
 export async function generateMetadata(): Promise<Metadata> {
     return {
-        title: "Tìm kiếm nâng cao | SilentRide",
+        title: "Tìm kiếm nâng cao | ToTo TAD Media",
         description: "Lọc và tìm kiếm phim theo tên, quốc gia, thể loại và danh sách.",
     };
 }
 
 export default async function AdvancedSearchPage({ searchParams }: Props) {
     const params = await searchParams;
-    const keyword = params.q || "";
-    const genre = params.genre ? params.genre.split(",") : [];
-    const country = params.country ? params.country.split(",") : [];
-    const type = params.type ? params.type.split(",") : [];
-    const year = params.year || "";
-    const page = parseInt(params.page || "1", 10);
-    const limit = parseInt(params.limit || "24", 10);
+    const keyword = readSingleValue(params.q);
+    const category = readSingleValue(params.category || params.genre);
+    const country = readSingleValue(params.country);
+    const type = readSingleValue(params.type);
+    const year = readSingleValue(params.year);
+    const page = readPositiveInteger(params.page, 1);
+    const limit = readPositiveInteger(params.limit, 24);
 
-    // Fetch filters data
     const [genresData, countriesData] = await Promise.all([
         getCategories(),
         getCountries(),
     ]);
 
-    const genres = genresData?.data?.items || [];
-    const countries = countriesData?.data?.items || [];
+    const genres: Option[] = genresData?.data?.items || [];
+    const countries: Option[] = countriesData?.data?.items || [];
+    const types: Option[] = movieTypes.map(({ name, slug }) => ({ name, slug }));
 
-    // Map movieTypes for the search form
-    const types = movieTypes.map((t: { name: string, slug: string }) => ({ name: t.name, slug: t.slug }));
+    const hasFacetFilters = Boolean(category || country || type || year);
+    const hasSearchCriteria = Boolean(keyword || hasFacetFilters);
+    const hasUnsupportedCombination = Boolean(keyword && hasFacetFilters);
 
-    // Fetch search results
-    let searchData = null;
     let movies = [];
-    let pagination = { pageRanges: 1, currentPage: 1, totalItems: 0 };
+    let pagination: PaginationData = {
+        pageRanges: 1,
+        currentPage: 1,
+        totalItems: 0,
+        totalItemsPerPage: limit,
+    };
+    let hasError = false;
 
-    try {
-        searchData = await advancedSearch({
-            keyword,
-            category: genre,
-            country,
-            type,
-            year,
-            page,
-            limit,
-        });
-        movies = searchData?.data?.items || [];
-        pagination = searchData?.data?.params?.pagination || { pageRanges: 1, currentPage: 1, totalItems: 0 };
-    } catch (error) {
-        console.error("Advanced search failed:", error);
+    if (hasSearchCriteria && !hasUnsupportedCombination) {
+        try {
+            const searchData = await advancedSearch({
+                keyword,
+                category,
+                country,
+                type,
+                year,
+                page,
+                limit,
+            });
+            movies = searchData?.data?.items || [];
+            pagination = searchData?.data?.params?.pagination || pagination;
+        } catch (error) {
+            console.error("Advanced search failed:", error);
+            hasError = true;
+        }
     }
 
     const totalItems = pagination.totalItems || movies.length;
-    const totalPages = Math.ceil(totalItems / 24) || 1;
+    const itemsPerPage = pagination.totalItemsPerPage || limit;
+    const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
-    // Build base URL for pagination (without page and without fragment)
     const baseUrlParams = new URLSearchParams();
-    if (genre.length > 0) baseUrlParams.set("genre", genre.join(","));
-    if (type.length > 0) baseUrlParams.set("type", type.join(","));
     if (keyword) baseUrlParams.set("q", keyword);
-    if (country.length > 0) baseUrlParams.set("country", country.join(","));
+    if (type) baseUrlParams.set("type", type);
+    if (category) baseUrlParams.set("category", category);
+    if (country) baseUrlParams.set("country", country);
     if (year) baseUrlParams.set("year", year);
     baseUrlParams.set("limit", limit.toString());
-
     const baseUrl = `/tim-kiem-nang-cao?${baseUrlParams.toString()}`;
 
-    // Collapse filter if we have results and either page > 1 or filters are applied
-    const hasFilters = !!keyword || genre.length > 0 || country.length > 0 || type.length > 0 || !!year;
-    const isCollapsed = page > 1 || (movies.length > 0 && hasFilters);
+    const appliedFilters = [
+        keyword ? { label: "Từ khóa", value: `“${keyword}”` } : null,
+        type ? { label: "Loại phim", value: getOptionName(types, type) } : null,
+        category
+            ? { label: "Thể loại", value: getOptionName(genres, category) }
+            : null,
+        country
+            ? { label: "Quốc gia", value: getOptionName(countries, country) }
+            : null,
+        year ? { label: "Năm", value: year } : null,
+    ].filter((filter): filter is { label: string; value: string } => Boolean(filter));
 
     return (
-        <div className="container mx-auto px-4 py-8 min-h-screen">
-            <div className="flex flex-col gap-2 mb-8">
-                <h1 className="text-3xl md:text-5xl font-extrabold bg-gradient-to-r from-white via-white to-primary/50 bg-clip-text text-transparent">
-                    Tìm kiếm nâng cao
-                </h1>
-            </div>
+        <div className="page-shell">
+            <PageHeader
+                eyebrow="Bộ lọc phim"
+                title="Tìm kiếm nâng cao"
+                description="Tìm theo từ khóa hoặc thu hẹp danh sách bằng loại phim, thể loại, quốc gia và năm phát hành."
+            />
 
             <AdvancedSearchForm
+                key={[keyword, category, country, type, year].join("|")}
                 genres={genres}
                 countries={countries}
                 types={types}
-                initialValues={{ keyword, genre, country, type, year }}
-                isCollapsed={isCollapsed}
+                initialValues={{ keyword, category, country, type, year }}
             />
 
-            {/* Results Section */}
-            <div id="results" className="scroll-mt-20 space-y-6">
-                <div className="flex items-center justify-between border-b border-border pb-4">
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                        Kết quả tìm kiếm
-                        <span className="text-sm font-normal text-foreground-muted bg-white/5 px-2 py-0.5 rounded-full">
-                            {pagination.totalItems || movies.length} phim
-                        </span>
-                    </h2>
+            <section id="results" className="scroll-mt-24 space-y-6" aria-labelledby="results-title">
+                <div className="space-y-4 border-b border-border pb-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 id="results-title" className="text-xl font-bold tracking-tight">
+                            Kết quả tìm kiếm
+                        </h2>
+                        {hasSearchCriteria && !hasUnsupportedCombination && !hasError && (
+                            <span className="rounded-full border border-border bg-white/5 px-2.5 py-1 text-xs font-medium text-foreground-muted">
+                                {totalItems.toLocaleString("vi-VN")} phim
+                            </span>
+                        )}
+                    </div>
+
+                    {appliedFilters.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2" aria-label="Bộ lọc đang áp dụng">
+                            <span className="mr-1 text-xs font-semibold uppercase tracking-[0.12em] text-foreground-muted">
+                                Đang lọc
+                            </span>
+                            {appliedFilters.map((filter) => (
+                                <span
+                                    key={filter.label}
+                                    className="rounded-full border border-border bg-white/5 px-3 py-1.5 text-xs text-foreground-secondary"
+                                >
+                                    <span className="text-foreground-muted">{filter.label}:</span>{" "}
+                                    {filter.value}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
-                {movies.length > 0 ? (
+                {hasUnsupportedCombination ? (
+                    <EmptyState
+                        icon={<AlertTriangle className="h-5 w-5" />}
+                        title="Chưa thể kết hợp hai cách tìm kiếm"
+                        description="Nguồn phim hiện chưa hỗ trợ tìm theo tên kết hợp cùng bộ lọc. Bạn có thể tìm theo tên phim hoặc sử dụng bộ lọc để khám phá phim phù hợp."
+                    />
+                ) : hasError ? (
+                    <EmptyState
+                        icon={<AlertTriangle className="h-5 w-5" />}
+                        title="Tìm kiếm đang tạm gián đoạn"
+                        description="Không thể kết nối với nguồn phim. Vui lòng thử lại sau."
+                    />
+                ) : !hasSearchCriteria ? (
+                    <EmptyState
+                        icon={<Search className="h-5 w-5" />}
+                        title="Chọn phim theo cách của bạn"
+                        description="Nhập từ khóa hoặc chọn các bộ lọc phía trên, sau đó nhấn Tìm kiếm."
+                    />
+                ) : movies.length > 0 ? (
                     <>
                         <MovieGrid movies={movies} />
                         <Pagination
-                            currentPage={page}
+                            currentPage={pagination.currentPage || page}
                             totalPages={totalPages}
                             baseUrl={baseUrl}
                         />
                     </>
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-                        <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center">
-                            <FilterX className="w-10 h-10 text-foreground-muted" />
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-xl font-medium text-foreground-secondary">
-                                Không tìm thấy phim nào
-                            </p>
-                            <p className="text-sm text-foreground-muted max-w-xs mx-auto">
-                                Thử thay đổi các bộ lọc hoặc từ khóa tìm kiếm để có kết quả tốt hơn.
-                            </p>
-                        </div>
-                    </div>
+                    <EmptyState
+                        icon={<SearchX className="h-5 w-5" />}
+                        title="Không tìm thấy phim phù hợp"
+                        description="Thử giảm số bộ lọc hoặc thay đổi từ khóa để mở rộng kết quả."
+                    />
                 )}
-            </div>
+            </section>
         </div>
-    );
-}
-
-// Icon for empty results
-function FilterX(props: React.SVGProps<SVGSVGElement>) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M13.013 3H2l8 9.46V19l4 2v-8.54l.9-1.05" />
-            <path d="m22 2-5 5" />
-            <path d="m17 2 5 5" />
-        </svg>
     );
 }

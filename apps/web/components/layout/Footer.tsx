@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { Film, Github, Heart } from "lucide-react";
 
 export default function Footer() {
     return (
-        <footer className="border-t border-border bg-background-secondary mt-auto">
-            <div className="container mx-auto px-4 py-8">
-                <div className="text-center text-sm text-foreground-muted">
-                    <p>
-                        © {new Date().getFullYear()} SilentRide. Website chỉ dành cho mục đích cá nhân, KHÔNG chia sẻ ra cộng đồng.
-                    </p>
+        <footer className="mt-auto border-t border-border bg-background-secondary/70">
+            <div className="site-container flex flex-col gap-5 py-8 sm:flex-row sm:items-center sm:justify-between">
+                <Link href="/" prefetch={false} className="text-sm font-semibold tracking-wide text-foreground">
+                    ToTo TAD Media
+                </Link>
+                <div className="text-xs leading-relaxed text-foreground-muted sm:text-right">
+                    <p>© {new Date().getFullYear()} ToTo TAD Media. Trải nghiệm xem phim dành cho cá nhân và gia đình.</p>
+                    <p className="mt-1">Nội dung được tổng hợp từ các nguồn dữ liệu hiện có.</p>
                 </div>
             </div>
         </footer>

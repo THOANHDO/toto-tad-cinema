@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, X, ChevronDown, Filter, Check, RotateCcw } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Check, RotateCcw, Search } from "lucide-react";
 
 interface Option {
     name: string;
@@ -16,12 +15,99 @@ interface AdvancedSearchFormProps {
     types: Option[];
     initialValues: {
         keyword: string;
-        genre: string[];
-        country: string[];
-        type: string[];
+        category: string;
+        country: string;
+        type: string;
         year: string;
     };
-    isCollapsed?: boolean;
+}
+
+interface FilterGroupProps {
+    label: string;
+    options: Option[];
+    value: string;
+    onChange: (value: string) => void;
+    scrollable?: boolean;
+}
+
+function FilterGroup({
+    label,
+    options,
+    value,
+    onChange,
+    scrollable = false,
+}: FilterGroupProps) {
+    return (
+        <fieldset className="min-w-0 space-y-3">
+            <legend className="text-xs font-bold uppercase tracking-[0.14em] text-foreground-muted">
+                {label}
+            </legend>
+            <div
+                className={`grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 ${
+                    scrollable ? "max-h-52 overflow-y-auto pr-1" : ""
+                }`}
+            >
+                <button
+                    type="button"
+                    onClick={() => onChange("")}
+                    aria-pressed={!value}
+                    className={`flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
+                        !value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-background text-foreground-secondary hover:border-border-strong hover:text-white"
+                    }`}
+                >
+                    <span
+                        className={`flex h-4 w-4 flex-none items-center justify-center rounded-full border transition-colors ${
+                            !value ? "border-primary bg-primary" : "border-foreground-muted"
+                        }`}
+                    >
+                        {!value && (
+                            <Check
+                                aria-hidden="true"
+                                className="h-3 w-3 text-[var(--primary-text)]"
+                            />
+                        )}
+                    </span>
+                    <span className="truncate">Tất cả</span>
+                </button>
+
+                {options.map((option) => {
+                    const isSelected = value === option.slug;
+
+                    return (
+                        <button
+                            key={option.slug}
+                            type="button"
+                            onClick={() => onChange(isSelected ? "" : option.slug)}
+                            aria-pressed={isSelected}
+                            className={`flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
+                                isSelected
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-border bg-background text-foreground-secondary hover:border-border-strong hover:text-white"
+                            }`}
+                        >
+                            <span
+                                className={`flex h-4 w-4 flex-none items-center justify-center rounded-full border transition-colors ${
+                                    isSelected
+                                        ? "border-primary bg-primary"
+                                        : "border-foreground-muted"
+                                }`}
+                            >
+                                {isSelected && (
+                                    <Check
+                                        aria-hidden="true"
+                                        className="h-3 w-3 text-[var(--primary-text)]"
+                                    />
+                                )}
+                            </span>
+                            <span className="truncate">{option.name}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        </fieldset>
+    );
 }
 
 export default function AdvancedSearchForm({
@@ -29,214 +115,153 @@ export default function AdvancedSearchForm({
     countries,
     types,
     initialValues,
-    isCollapsed = false,
 }: AdvancedSearchFormProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
 
     const [keyword, setKeyword] = useState(initialValues.keyword);
-    const [selectedGenres, setSelectedGenres] = useState<string[]>(initialValues.genre);
-    const [selectedCountries, setSelectedCountries] = useState<string[]>(initialValues.country);
-    const [selectedTypes, setSelectedTypes] = useState<string[]>(initialValues.type);
+    const [category, setCategory] = useState(initialValues.category);
+    const [country, setCountry] = useState(initialValues.country);
+    const [type, setType] = useState(initialValues.type);
     const [year, setYear] = useState(initialValues.year);
 
-    const [showFilters, setShowFilters] = useState(!isCollapsed);
-
-    // Sync with prop if it changes
-    useEffect(() => {
-        setShowFilters(!isCollapsed);
-    }, [isCollapsed]);
-
-    // Years range
     const currentYear = new Date().getFullYear();
-    const years = Array.from({ length: 30 }, (_, i) => (currentYear - i).toString());
+    const years = Array.from({ length: 30 }, (_, index) =>
+        (currentYear - index).toString()
+    );
+    const hasDraftFilters = Boolean(keyword.trim() || category || country || type || year);
 
-    const toggleSelection = (slug: string, current: string[], setter: (val: string[]) => void) => {
-        if (current.includes(slug)) {
-            setter(current.filter(s => s !== slug));
-        } else {
-            setter([...current, slug]);
-        }
-    };
-
-    const handleSearch = (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
+    const handleSearch = (event: React.FormEvent) => {
+        event.preventDefault();
 
         const params = new URLSearchParams();
-        if (selectedGenres.length > 0) params.set("genre", selectedGenres.join(","));
-        if (selectedTypes.length > 0) params.set("type", selectedTypes.join(","));
-        if (keyword) params.set("q", keyword);
-        if (selectedCountries.length > 0) params.set("country", selectedCountries.join(","));
-        if (year) params.set("year", year);
+        const trimmedKeyword = keyword.trim();
 
-        // Preserve or set default limit
-        const currentLimit = searchParams.get("limit") || "24";
-        params.set("limit", currentLimit);
+        if (trimmedKeyword) params.set("q", trimmedKeyword);
+        if (type) params.set("type", type);
+        if (category) params.set("category", category);
+        if (country) params.set("country", country);
+        if (year) params.set("year", year);
+        params.set("page", "1");
+        params.set("limit", searchParams.get("limit") || "24");
 
         router.push(`/tim-kiem-nang-cao?${params.toString()}#results`);
     };
 
     const handleReset = () => {
         setKeyword("");
-        setSelectedGenres([]);
-        setSelectedCountries([]);
-        setSelectedTypes([]);
+        setCategory("");
+        setCountry("");
+        setType("");
         setYear("");
         router.push("/tim-kiem-nang-cao");
     };
 
     return (
-        <div className="bg-background-secondary rounded-2xl border border-border overflow-hidden mb-8 shadow-xl">
-            <div className="p-4 md:p-8">
-                <form onSubmit={handleSearch} className="space-y-8">
-                    {/* Keyword Search */}
-                    <div className="relative group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground-muted group-focus-within:text-primary transition-colors" />
-                        <input
-                            type="text"
-                            value={keyword}
-                            onChange={(e) => setKeyword(e.target.value)}
-                            placeholder="Nhập tên phim cần tìm..."
-                            className="w-full pl-12 pr-4 py-4 bg-background rounded-xl border border-border focus:border-primary focus:outline-none transition-all placeholder:text-foreground-muted/50 text-lg"
-                        />
+        <div className="surface-panel mb-10 overflow-hidden">
+            <div className="p-4 sm:p-6 md:p-8">
+                <form onSubmit={handleSearch} className="space-y-7" role="search">
+                    <div className="space-y-2">
+                        <label
+                            htmlFor="advanced-keyword"
+                            className="text-xs font-bold uppercase tracking-[0.14em] text-foreground-muted"
+                        >
+                            Tên phim hoặc từ khóa
+                        </label>
+                        <div className="group relative">
+                            <Search
+                                aria-hidden="true"
+                                className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground-muted transition-colors group-focus-within:text-primary"
+                            />
+                            <input
+                                id="advanced-keyword"
+                                type="search"
+                                value={keyword}
+                                onChange={(event) => setKeyword(event.target.value)}
+                                placeholder="Nhập tên phim cần tìm..."
+                                className="min-h-12 w-full rounded-xl border border-border bg-background py-3 pl-12 pr-4 text-base transition-colors focus:border-primary focus:outline-none sm:text-lg"
+                            />
+                        </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="grid gap-7 border-t border-border pt-7">
+                        <FilterGroup
+                            label="Loại hoặc danh sách phim"
+                            options={types}
+                            value={type}
+                            onChange={setType}
+                        />
+                        <FilterGroup
+                            label="Thể loại"
+                            options={genres}
+                            value={category}
+                            onChange={setCategory}
+                            scrollable
+                        />
+                        <FilterGroup
+                            label="Quốc gia"
+                            options={countries}
+                            value={country}
+                            onChange={setCountry}
+                            scrollable
+                        />
+
+                        <fieldset className="min-w-0 space-y-3">
+                            <legend className="text-xs font-bold uppercase tracking-[0.14em] text-foreground-muted">
+                                Năm phát hành
+                            </legend>
+                            <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1 md:max-h-36 md:flex-wrap md:overflow-y-auto md:pr-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setYear("")}
+                                    aria-pressed={!year}
+                                    className={`min-h-11 flex-none rounded-lg border px-3.5 py-2 text-sm transition-colors ${
+                                        !year
+                                            ? "border-primary bg-primary text-[var(--primary-text)]"
+                                            : "border-border bg-background text-foreground-secondary hover:border-border-strong hover:text-white"
+                                    }`}
+                                >
+                                    Tất cả
+                                </button>
+                                {years.map((optionYear) => (
+                                    <button
+                                        key={optionYear}
+                                        type="button"
+                                        onClick={() =>
+                                            setYear(optionYear === year ? "" : optionYear)
+                                        }
+                                        aria-pressed={optionYear === year}
+                                        className={`min-h-11 flex-none rounded-lg border px-3.5 py-2 text-sm transition-colors ${
+                                            optionYear === year
+                                                ? "border-primary bg-primary text-[var(--primary-text)]"
+                                                : "border-border bg-background text-foreground-secondary hover:border-border-strong hover:text-white"
+                                        }`}
+                                    >
+                                        {optionYear}
+                                    </button>
+                                ))}
+                            </div>
+                        </fieldset>
+                    </div>
+
+                    <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:items-center">
                         <button
                             type="button"
-                            onClick={() => setShowFilters(!showFilters)}
-                            className="flex items-center gap-2 text-sm font-semibold text-foreground-secondary hover:text-white transition-colors py-2 px-4 rounded-lg hover:bg-white/5"
+                            onClick={handleReset}
+                            disabled={!hasDraftFilters}
+                            className="button-secondary min-h-11 px-5 disabled:cursor-not-allowed disabled:opacity-45"
                         >
-                            <Filter className="w-4 h-4" />
-                            {showFilters ? "Ẩn bộ lọc" : "Hiện bộ lọc nâng cao"}
-                            <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showFilters ? "rotate-180" : ""}`} />
+                            <RotateCcw aria-hidden="true" className="h-4 w-4" />
+                            Xoá bộ lọc
                         </button>
-
-                        {(keyword || selectedGenres.length > 0 || selectedCountries.length > 0 || selectedTypes.length > 0 || year) && (
-                            <button
-                                type="button"
-                                onClick={handleReset}
-                                className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors py-2 px-4 rounded-lg hover:bg-primary/5"
-                            >
-                                <RotateCcw className="w-3 h-3" />
-                                Đặt lại mặc định
-                            </button>
-                        )}
+                        <button
+                            type="submit"
+                            className="button-primary min-h-11 px-6 sm:min-w-48"
+                        >
+                            <Search aria-hidden="true" className="h-5 w-5" />
+                            Tìm kiếm
+                        </button>
                     </div>
-
-                    <AnimatePresence>
-                        {showFilters && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                className="overflow-hidden"
-                            >
-                                <div className="space-y-8 pt-4">
-                                    {/* Year Select - Single Choice */}
-                                    <div className="space-y-3">
-                                        <label className="text-sm font-bold text-foreground-muted uppercase tracking-widest">
-                                            Năm phát hành
-                                        </label>
-                                        <div className="flex flex-wrap gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setYear("")}
-                                                className={`px-4 py-2 rounded-lg text-sm transition-all ${!year ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-background hover:bg-white/5 border border-border text-foreground-secondary"}`}
-                                            >
-                                                Tất cả
-                                            </button>
-                                            {years.map((y) => (
-                                                <button
-                                                    key={y}
-                                                    type="button"
-                                                    onClick={() => setYear(y === year ? "" : y)}
-                                                    className={`px-4 py-2 rounded-lg text-sm transition-all ${y === year ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-background hover:bg-white/5 border border-border text-foreground-secondary"}`}
-                                                >
-                                                    {y}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Type Selection (Grid) */}
-                                    <div className="space-y-3">
-                                        <label className="text-sm font-bold text-foreground-muted uppercase tracking-widest">
-                                            Danh sách phim
-                                        </label>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-9 gap-2">
-                                            {types.map((t) => (
-                                                <button
-                                                    key={t.slug}
-                                                    type="button"
-                                                    onClick={() => toggleSelection(t.slug, selectedTypes, setSelectedTypes)}
-                                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all border ${selectedTypes.includes(t.slug) ? "bg-primary/10 border-primary text-primary" : "bg-background border-border text-foreground-secondary hover:border-foreground-muted"}`}
-                                                >
-                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedTypes.includes(t.slug) ? "bg-primary border-primary" : "border-foreground-muted"}`}>
-                                                        {selectedTypes.includes(t.slug) && <Check className="w-3 h-3 text-white" />}
-                                                    </div>
-                                                    <span className="truncate">{t.name}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Genre Selection (Grid) */}
-                                    <div className="space-y-3">
-                                        <label className="text-sm font-bold text-foreground-muted uppercase tracking-widest">
-                                            Thể loại
-                                        </label>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-10 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                                            {genres.map((g) => (
-                                                <button
-                                                    key={g.slug}
-                                                    type="button"
-                                                    onClick={() => toggleSelection(g.slug, selectedGenres, setSelectedGenres)}
-                                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all border ${selectedGenres.includes(g.slug) ? "bg-primary/10 border-primary text-primary" : "bg-background border-border text-foreground-secondary hover:border-foreground-muted"}`}
-                                                >
-                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedGenres.includes(g.slug) ? "bg-primary border-primary" : "border-foreground-muted"}`}>
-                                                        {selectedGenres.includes(g.slug) && <Check className="w-3 h-3 text-white" />}
-                                                    </div>
-                                                    <span className="truncate">{g.name}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Country Selection (Grid) */}
-                                    <div className="space-y-3">
-                                        <label className="text-sm font-bold text-foreground-muted uppercase tracking-widest">
-                                            Quốc gia
-                                        </label>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-10 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                                            {countries.map((c) => (
-                                                <button
-                                                    key={c.slug}
-                                                    type="button"
-                                                    onClick={() => toggleSelection(c.slug, selectedCountries, setSelectedCountries)}
-                                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all border ${selectedCountries.includes(c.slug) ? "bg-primary/10 border-primary text-primary" : "bg-background border-border text-foreground-secondary hover:border-foreground-muted"}`}
-                                                >
-                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedCountries.includes(c.slug) ? "bg-primary border-primary" : "border-foreground-muted"}`}>
-                                                        {selectedCountries.includes(c.slug) && <Check className="w-3 h-3 text-white" />}
-                                                    </div>
-                                                    <span className="truncate">{c.name}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    <button
-                        type="submit"
-                        className="w-full py-5 bg-primary hover:bg-primary/90 text-white font-bold rounded-2xl transition-all shadow-xl shadow-primary/30 flex items-center justify-center gap-3 group relative overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                        <Search className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                        <span className="text-lg">Tìm kiếm</span>
-                    </button>
                 </form>
             </div>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Keyboard, Tablet, MousePointer2, Zap, ArrowLeft, ArrowRight, ArrowUp, ArrowDown } from "lucide-react";
+import { X, Keyboard, Tablet, Zap, ArrowLeft, ArrowRight, ArrowUp, ArrowDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface HelpDialogProps {
@@ -56,7 +56,7 @@ export default function HelpDialog({ isOpen, onClose }: HelpDialogProps) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                        className="absolute inset-0 bg-black/82 backdrop-blur-md"
                         onClick={onClose}
                     />
 
@@ -64,29 +64,33 @@ export default function HelpDialog({ isOpen, onClose }: HelpDialogProps) {
                         initial={{ opacity: 0, scale: 0.9, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                        className="relative w-full max-w-lg bg-background-secondary border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="help-dialog-title"
+                        className="surface-panel relative w-full max-w-lg overflow-hidden shadow-[var(--shadow-lg)]"
                     >
                         {/* Header */}
-                        <div className="relative p-6 border-b border-white/5 bg-gradient-to-r from-primary/10 to-transparent">
+                        <div className="relative border-b border-border bg-gradient-to-r from-primary/10 to-transparent p-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
                                     <Zap className="w-6 h-6 text-primary" />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-white">Hướng dẫn sử dụng</h2>
+                                    <h2 id="help-dialog-title" className="text-xl font-bold text-white">Hướng dẫn sử dụng</h2>
                                     <p className="text-xs text-foreground-muted">Tối ưu trải nghiệm xem phim của bạn</p>
                                 </div>
                             </div>
                             <button
                                 onClick={onClose}
-                                className="absolute top-6 right-6 p-2 hover:bg-white/5 rounded-full transition-colors text-foreground-muted hover:text-white"
+                                className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-white/5 hover:text-white"
+                                aria-label="Đóng hướng dẫn"
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
                         {/* Content */}
-                        <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto scrollbar-hide">
+                        <div className="hide-scrollbar max-h-[70vh] space-y-7 overflow-y-auto p-6">
                             {sections.map((section, idx) => (
                                 <div key={idx} className="space-y-4">
                                     <div className="flex items-center gap-2 text-primary font-semibold text-sm uppercase tracking-wider">
@@ -95,9 +99,9 @@ export default function HelpDialog({ isOpen, onClose }: HelpDialogProps) {
                                     </div>
                                     <div className="grid grid-cols-1 gap-3">
                                         {section.items.map((item, i) => (
-                                            <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 group hover:border-primary/30 transition-colors">
+                                            <div key={i} className="flex items-center justify-between rounded-xl border border-border bg-background p-3 transition-colors hover:border-border-strong">
                                                 <span className="text-sm text-foreground-secondary">{item.label}</span>
-                                                <div className="px-2 py-1 rounded bg-zinc-800 border border-white/10 text-[10px] font-mono text-white flex items-center justify-center min-w-[32px]">
+                                                <div className="flex min-w-8 items-center justify-center rounded border border-border-strong bg-background-tertiary px-2 py-1 font-mono text-[10px] text-white">
                                                     {item.key}
                                                 </div>
                                             </div>
@@ -108,10 +112,11 @@ export default function HelpDialog({ isOpen, onClose }: HelpDialogProps) {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-6 bg-black/20 border-t border-white/5">
+                        <div className="border-t border-border bg-black/20 p-6">
                             <button
+                                type="button"
                                 onClick={onClose}
-                                className="w-full py-3 bg-primary hover:bg-primary-hover text-white font-bold rounded-2xl shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                className="button-primary w-full"
                             >
                                 Đã hiểu, bắt đầu xem phim!
                             </button>

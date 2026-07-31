@@ -163,8 +163,8 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
     }, []);
 
     return (
-        <div className="plyr-container w-full h-full min-h-[200px] rounded-lg overflow-hidden border border-white/5 shadow-2xl relative z-10 bg-black group flex items-center justify-center">
-            <video ref={videoRef} className="plyr-react h-full w-full block" crossOrigin="anonymous" playsInline />
+        <div className="plyr-container group relative z-10 flex h-full min-h-[180px] w-full items-center justify-center overflow-hidden bg-black sm:min-h-[240px]">
+            <video ref={videoRef} className="plyr-react block h-full w-full" crossOrigin="anonymous" playsInline />
         </div>
     );
 });

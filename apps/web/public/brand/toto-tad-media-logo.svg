@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 310 100" role="img" aria-labelledby="title description">
+  <title id="title">ToTo TAD Media</title>
+  <desc id="description">Mascot đeo kính tròn cùng wordmark ToTo TAD Media</desc>
+
+  <g transform="translate(3 2) scale(.96)" stroke="#17191E" stroke-linecap="round" stroke-linejoin="round">
+    <path
+      d="M21 43c-5-1-9 3-9 9 0 7 5 12 11 11 4 14 13 23 25 23s21-9 25-23c6 1 11-4 11-11 0-6-4-10-9-9-2-19-12-30-27-30S23 24 21 43Z"
+      fill="#FFD8BD"
+      stroke-width="4"
+    />
+    <path
+      d="M20 44c-1-9 0-18 5-25C31 9 42 6 53 8c17 2 27 13 28 30-8 3-19 2-27-1-7-3-11-8-13-15-7 1-14 4-19 9Z"
+      fill="#252832"
+      stroke-width="4"
+    />
+    <path d="M42 19c-7 1-14 4-20 10" fill="none" stroke="#3A3D48" stroke-width="3" />
+    <path d="M27 39c5-3 10-3 15 0M54 39c5-3 10-3 15 0" fill="none" stroke-width="3.5" />
+    <circle cx="34" cy="51" r="13" fill="#FFF8EF" stroke-width="4" />
+    <circle cx="62" cy="51" r="13" fill="#FFF8EF" stroke-width="4" />
+    <path d="M47 50c1-1 1-1 2 0" fill="none" stroke-width="4" />
+    <circle cx="36" cy="51" r="4.5" fill="#17191E" stroke="none" />
+    <circle cx="64" cy="51" r="4.5" fill="#17191E" stroke="none" />
+    <path d="M35 68c8 7 18 7 26 0" fill="none" stroke-width="3.5" />
+    <circle cx="76" cy="76" r="10" fill="#17191E" stroke="none" />
+    <path d="m74 70 9 6-9 6Z" fill="#E73343" stroke="none" />
+  </g>
+
+  <g
+    font-family="Arial, Helvetica, sans-serif"
+    font-weight="900"
+    paint-order="stroke fill"
+    stroke="#17191E"
+    stroke-linejoin="round"
+  >
+    <text x="105" y="48" fill="#E73343" font-size="39" letter-spacing="-2" stroke-width="2.5">ToTo</text>
+    <text x="196" y="48" fill="#FFF3E6" font-size="39" letter-spacing="-1.5" stroke-width="2.5">TAD</text>
+    <text x="108" y="73" fill="#FFF3E6" font-size="13" letter-spacing="8" stroke-width="1.6">MEDIA</text>
+  </g>
+</svg>
