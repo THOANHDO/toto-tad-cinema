@@ -1,10 +1,10 @@
 export default function MovieCardSkeleton() {
     return (
-        <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-background-secondary">
-            <div className="skeleton w-full h-full" />
-            <div className="absolute bottom-0 left-0 right-0 p-3">
-                <div className="skeleton h-4 w-3/4 rounded mb-2" />
-                <div className="skeleton h-3 w-1/2 rounded" />
+        <div aria-hidden="true">
+            <div className="skeleton aspect-[2/3] rounded-[var(--radius-lg)]" />
+            <div className="pt-3">
+                <div className="skeleton h-4 w-4/5 rounded-md" />
+                <div className="skeleton mt-2 h-3 w-2/5 rounded-md" />
             </div>
         </div>
     );
@@ -12,9 +12,12 @@ export default function MovieCardSkeleton() {
 
 export function MovieGridSkeleton({ count = 12 }: { count?: number }) {
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-            {Array.from({ length: count }).map((_, i) => (
-                <MovieCardSkeleton key={i} />
+        <div
+            className="grid grid-cols-2 gap-x-3 gap-y-7 min-[520px]:grid-cols-3 sm:gap-x-4 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 xl:grid-cols-6 xl:gap-x-6"
+            aria-label="Đang tải danh sách phim"
+        >
+            {Array.from({ length: count }).map((_, index) => (
+                <MovieCardSkeleton key={index} />
             ))}
         </div>
     );
@@ -22,11 +25,11 @@ export function MovieGridSkeleton({ count = 12 }: { count?: number }) {
 
 export function MovieSliderSkeleton({ count = 6 }: { count?: number }) {
     return (
-        <div className="flex gap-4 overflow-hidden pb-4">
-            {Array.from({ length: count }).map((_, i) => (
+        <div className="flex gap-3 overflow-hidden pb-3 sm:gap-4 lg:gap-4 xl:gap-5" aria-label="Đang tải phim">
+            {Array.from({ length: count }).map((_, index) => (
                 <div
-                    key={i}
-                    className="flex-shrink-0 w-[calc(50%-8px)] sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)] lg:w-[calc(20%-13px)] xl:w-[calc(16.666%-13px)]"
+                    key={index}
+                    className="w-[42vw] max-w-[12.25rem] flex-none min-[520px]:w-[30vw] sm:w-[27vw] md:w-[29vw] md:max-w-none lg:w-[22vw] xl:w-[calc((100%-6.25rem)/6)]"
                 >
                     <MovieCardSkeleton />
                 </div>
@@ -37,14 +40,17 @@ export function MovieSliderSkeleton({ count = 6 }: { count?: number }) {
 
 export function HeroSkeleton() {
     return (
-        <div className="relative h-[60vh] md:h-[70vh] skeleton">
-            <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
-                <div className="skeleton h-8 w-1/3 rounded mb-4" />
-                <div className="skeleton h-4 w-2/3 rounded mb-2" />
-                <div className="skeleton h-4 w-1/2 rounded mb-6" />
-                <div className="flex gap-4">
-                    <div className="skeleton h-12 w-32 rounded-lg" />
-                    <div className="skeleton h-12 w-32 rounded-lg" />
+        <div className="relative min-h-[34rem] overflow-hidden sm:min-h-[38rem] md:h-[66svh] md:min-h-[36rem] md:max-h-[44rem] lg:h-[68svh] lg:max-h-[48rem] xl:h-[76vh] xl:min-h-[42rem] xl:max-h-[54rem]">
+            <div className="skeleton absolute inset-0" />
+            <div className="site-container relative flex min-h-[34rem] items-end pb-20 pt-28 sm:min-h-[38rem] md:min-h-[36rem] lg:items-center xl:min-h-[42rem]">
+                <div className="w-full max-w-xl">
+                    <div className="skeleton mb-5 h-3 w-28 rounded" />
+                    <div className="skeleton h-12 w-4/5 rounded-lg sm:h-16" />
+                    <div className="skeleton mt-4 h-5 w-1/2 rounded" />
+                    <div className="mt-7 flex gap-3">
+                        <div className="skeleton h-11 w-32 rounded-xl" />
+                        <div className="skeleton h-11 w-32 rounded-xl" />
+                    </div>
                 </div>
             </div>
         </div>

@@ -2,10 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Play, Heart, Clock, Star } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Clock, Heart, Play } from "lucide-react";
 import { getImageUrl } from "@/lib/api/ophim";
-import { useStore } from "@/lib/store/useStore";
 import { useProfileStore } from "@/lib/store/useProfileStore";
 import { toggleFavorite } from "@/app/yeu-thich/actions";
 import type { Movie } from "@/types/movie";
@@ -18,136 +17,128 @@ interface MovieCardProps {
 
 export default function MovieCard({ movie, index = 0, showProgress = true }: MovieCardProps) {
     const { currentProfile, favoriteSlugs, toggleFavoriteSlug, watchProgress } = useProfileStore();
+    const shouldReduceMotion = useReducedMotion();
     const isLiked = favoriteSlugs.includes(movie.slug);
-    
-    // Get progress from profile store instead of local useStore
     const progress = showProgress ? watchProgress[movie.slug] : null;
 
     const progressPercent = progress
         ? Math.round((progress.currentTime / progress.duration) * 100)
         : 0;
 
-    const handleFavoriteClick = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
+    const handleFavoriteClick = async (event: React.MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+
         if (!currentProfile?.id) {
-            console.warn('Vui lòng chọn Profile để thực hiện tính năng này');
+            console.warn("Vui lòng chọn Profile để thực hiện tính năng này");
             return;
         }
 
-        // Toggle local state for immediate feedback
         toggleFavoriteSlug(movie.slug);
 
-        // Sync with Supabase
         const result = await toggleFavorite(currentProfile.id, {
             movie_slug: movie.slug,
             movie_title: movie.name,
-            poster_url: movie.thumb_url
+            poster_url: movie.thumb_url,
         });
 
-        if (result && 'error' in result) {
-            console.error('Lỗi khi lưu phim yêu thích:', result.error);
-            // Rollback local state on error
+        if (result && "error" in result) {
+            console.error("Lỗi khi lưu phim yêu thích:", result.error);
             toggleFavoriteSlug(movie.slug);
         }
     };
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
+        <motion.article
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.05 }}
-            className="group relative"
+            transition={{ duration: 0.3, delay: Math.min(index, 6) * 0.035 }}
+            className="group relative min-w-0"
         >
-            <Link href={`/phim/${movie.slug}`} prefetch={false} className="block">
-                <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-background-secondary">
-                    {/* Thumbnail */}
-                    <Image
-                        src={getImageUrl(movie.thumb_url)}
-                        alt={movie.name}
-                        fill
-                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                        className="object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
+            <div className="relative">
+                <Link
+                    href={`/phim/${movie.slug}`}
+                    prefetch={false}
+                    className="block overflow-hidden rounded-[var(--radius-lg)] bg-background-secondary shadow-[var(--shadow-sm)] ring-1 ring-white/6 transition-[transform,box-shadow,ring-color] duration-300 ease-out hover:-translate-y-1 hover:shadow-[var(--shadow-md)] hover:ring-white/14"
+                    aria-label={`Xem chi tiết ${movie.name}`}
+                >
+                    <div className="relative aspect-[2/3] overflow-hidden">
+                        <Image
+                            src={getImageUrl(movie.thumb_url)}
+                            alt={movie.name}
+                            fill
+                            sizes="(max-width: 480px) 46vw, (max-width: 767px) 31vw, (max-width: 1023px) 30vw, (max-width: 1279px) 22vw, 16vw"
+                            className="object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.035]"
+                        />
 
-                    {/* Overlay gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-90 transition-opacity" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/10 opacity-45 transition-opacity duration-300 group-hover:opacity-70" />
 
-                    {/* Quality badge */}
-                    {movie.quality && (
-                        <div className="absolute top-2 left-2 px-2 py-0.5 bg-primary text-white text-xs font-semibold rounded">
-                            {movie.quality}
-                        </div>
-                    )}
+                        {movie.quality && (
+                            <span className="absolute left-2.5 top-2.5 rounded-md bg-primary px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[var(--primary-text)] shadow-lg">
+                                {movie.quality}
+                            </span>
+                        )}
 
-                    {/* Episode badge */}
-                    {movie.episode_current && (
-                        <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/70 text-white text-xs rounded">
-                            {movie.episode_current}
-                        </div>
-                    )}
+                        {movie.episode_current && (
+                            <span className="absolute bottom-2.5 right-2.5 max-w-[80%] truncate rounded-md border border-white/10 bg-black/72 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+                                {movie.episode_current}
+                            </span>
+                        )}
 
-                    {/* Favorite button - Positioned below episode badge to avoid overlap */}
-                    <button
-                        onClick={handleFavoriteClick}
-                        className={`absolute top-10 right-2 p-1.5 rounded-full transition-all z-10 ${isLiked
-                                ? "bg-primary text-white"
-                                : "bg-black/50 text-white md:opacity-0 group-hover:opacity-100"
-                            }`}
-                        aria-label={isLiked ? "Bỏ thích" : "Thêm yêu thích"}
-                    >
-                        <Heart className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
-                    </button>
+                        <span className="absolute inset-0 hidden items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100 xl:flex">
+                            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black shadow-xl transition-transform duration-200 group-hover:scale-100">
+                                <Play className="ml-0.5 h-5 w-5 fill-current" />
+                            </span>
+                        </span>
 
-                    {/* Play button overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <motion.div
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="w-14 h-14 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/30"
-                        >
-                            <Play className="w-6 h-6 text-white ml-1" fill="white" />
-                        </motion.div>
+                        {progress && progressPercent > 0 && (
+                            <div className="absolute inset-x-0 bottom-0 h-1 bg-white/20" aria-label={`Đã xem ${progressPercent}%`}>
+                                <div
+                                    className="h-full bg-primary transition-[width] duration-300"
+                                    style={{ width: `${progressPercent}%` }}
+                                />
+                            </div>
+                        )}
                     </div>
+                </Link>
 
-                    {/* Progress bar */}
-                    {progress && progressPercent > 0 && (
-                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
-                            <div
-                                className="h-full bg-primary transition-all"
-                                style={{ width: `${progressPercent}%` }}
-                            />
-                        </div>
-                    )}
+                <button
+                    type="button"
+                    onClick={handleFavoriteClick}
+                    className={`absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full border text-white shadow-lg backdrop-blur-md transition-colors md:h-11 md:w-11 xl:h-8 xl:w-8 ${
+                        isLiked
+                            ? "border-primary bg-primary"
+                            : "border-white/12 bg-black/55 hover:border-white/25 hover:bg-black/75 xl:opacity-0 xl:group-hover:opacity-100 xl:group-focus-within:opacity-100"
+                    } ${movie.quality ? "top-11" : ""}`}
+                    aria-label={isLiked ? `Bỏ ${movie.name} khỏi yêu thích` : `Thêm ${movie.name} vào yêu thích`}
+                    aria-pressed={isLiked}
+                >
+                    <Heart className={`h-4 w-4 md:h-5 md:w-5 xl:h-4 xl:w-4 ${isLiked ? "fill-current" : ""}`} />
+                </button>
+            </div>
 
-                    {/* Bottom info */}
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
-                        <h3 className="font-semibold text-white text-sm line-clamp-2 group-hover:text-primary transition-colors">
-                            {movie.name}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-foreground-secondary">
-                            {movie.year && <span>{movie.year}</span>}
-                            {movie.lang && (
-                                <>
-                                    <span>•</span>
-                                    <span>{movie.lang}</span>
-                                </>
-                            )}
-                        </div>
+            <div className="px-0.5 pt-3">
+                <Link
+                    href={`/phim/${movie.slug}`}
+                    prefetch={false}
+                    className="line-clamp-1 text-sm font-semibold leading-5 text-foreground transition-colors hover:text-primary sm:text-[0.94rem] md:text-base xl:text-[0.94rem]"
+                >
+                    {movie.name}
+                </Link>
+                <div className="mt-1.5 flex min-h-4 items-center gap-2 text-xs text-foreground-muted md:text-[0.8rem] xl:text-xs">
+                    {movie.year > 0 && <span>{movie.year}</span>}
+                    {movie.year > 0 && movie.lang && <span aria-hidden="true">·</span>}
+                    {movie.lang && <span className="line-clamp-1">{movie.lang}</span>}
+                </div>
+                {progress && (
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-foreground-secondary">
+                        <Clock className="h-3 w-3 flex-none text-primary" />
+                        <span className="line-clamp-1">
+                            Tiếp tục {progress.episodeName || `Tập ${progress.episode}`}
+                        </span>
                     </div>
-                </div>
-            </Link>
-
-            {/* Continue watching indicator */}
-            {progress && (
-                <div className="flex items-center gap-1 mt-2 text-xs text-foreground-muted">
-                    <Clock className="w-3 h-3" />
-                    <span>
-                        Đang xem: {progress.episodeName || `Tập ${progress.episode}`}
-                    </span>
-                </div>
-            )}
-        </motion.div>
+                )}
+            </div>
+        </motion.article>
     );
 }

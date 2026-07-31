@@ -2,7 +2,6 @@
 
 import { Heart } from "lucide-react";
 import { motion } from "framer-motion";
-import { useStore } from "@/lib/store/useStore";
 import { useProfileStore } from "@/lib/store/useProfileStore";
 import { toggleFavorite } from "@/app/yeu-thich/actions";
 import type { MovieDetail } from "@/types/movie";
@@ -44,13 +43,15 @@ export default function FavoriteButton({ movie }: FavoriteButtonProps) {
 
     return (
         <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.98 }}
+            type="button"
             onClick={handleClick}
-            className={`inline-flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-colors ${isLiked
-                    ? "bg-primary text-white"
-                    : "bg-white/10 hover:bg-white/20 text-white"
+            className={`button-secondary min-w-36 ${isLiked
+                    ? "border-primary/60 bg-primary/18 text-primary"
+                    : ""
                 }`}
+            aria-pressed={isLiked}
         >
             <Heart className={`w-5 h-5 ${isLiked ? "fill-current" : ""}`} />
             {isLiked ? "Đã thích" : "Yêu thích"}

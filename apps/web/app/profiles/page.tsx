@@ -2,7 +2,7 @@ import ProfilesClient from './client'
 import { getProfiles } from './actions'
 
 export const metadata = {
-  title: 'Ai đang xem? | Silent Ride Movie',
+  title: 'Ai đang xem? | ToTo TAD Media',
   description: 'Chọn profile của bạn để tiếp tục',
 }
 

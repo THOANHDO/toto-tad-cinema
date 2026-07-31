@@ -16,20 +16,22 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "SilentRide - Xem phim miễn phí",
-    template: "%s | SilentRide",
+    default: "ToTo TAD Media – Xem phim trực tuyến",
+    template: "%s | ToTo TAD Media",
   },
   description: "Website xem phim miễn phí với chất lượng cao. Phim lẻ, phim bộ, hoạt hình mới nhất.",
   keywords: ["xem phim", "phim online", "phim miễn phí", "phim hay", "phim bộ", "phim lẻ"],
-  authors: [{ name: "SilentRide" }],
+  authors: [{ name: "ToTo TAD Media" }],
   openGraph: {
     type: "website",
     locale: "vi_VN",
-    siteName: "SilentRide",
+    siteName: "ToTo TAD Media",
   },
   icons: {
-    icon: "/favicon.ico",
-    apple: "/logo.png",
+    icon: [
+      { url: "/icon.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
@@ -50,7 +52,7 @@ export default function RootLayout({
       >
         <ProfileGuard>
           <Header />
-          <main className="flex-1 pt-16 md:pt-20">{children}</main>
+          <main className="flex-1">{children}</main>
           <Footer />
         </ProfileGuard>
       </body>

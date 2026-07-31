@@ -5,8 +5,11 @@ import { notFound } from "next/navigation";
 import { getMoviesByType } from "@/lib/api/unified";
 import MovieGrid from "@/components/movie/MovieGrid";
 import Pagination from "@/components/ui/Pagination";
-import SplashScreen from "@/components/ui/SplashScreen";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
+import { MovieGridSkeleton } from "@/components/ui/Skeleton";
 import { useMovieData } from "@/lib/hooks/use-movie-data";
+import { Film, RefreshCw } from "lucide-react";
 
 const typeNames: Record<string, string> = {
     "phim-moi": "Phim Mới",
@@ -34,13 +37,18 @@ export default function MovieListPage({ params, searchParams }: Props) {
     const { page } = use(searchParams);
     const currentPage = parseInt(page || "1", 10);
 
-    const { data, loading } = useMovieData(
+    const { data, loading, error } = useMovieData(
         `list-${type}-p${currentPage}`,
         () => getMoviesByType(type, currentPage)
     );
 
     if (loading) {
-        return <SplashScreen />;
+        return (
+            <div className="page-shell">
+                <div className="skeleton mb-10 h-14 w-64 rounded-xl" />
+                <MovieGridSkeleton />
+            </div>
+        );
     }
 
     if (!typeNames[type]) {
@@ -53,17 +61,26 @@ export default function MovieListPage({ params, searchParams }: Props) {
     const totalPages = Math.ceil(totalItems / 24) || 1;
 
     return (
-        <div className="container mx-auto px-4 py-8">
-            <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl md:text-3xl font-bold">{typeNames[type]}</h1>
-                {totalItems > 0 && (
-                    <p className="text-foreground-secondary text-sm">
-                        {totalItems.toLocaleString()} phim
-                    </p>
-                )}
-            </div>
+        <div className="page-shell">
+            <PageHeader
+                eyebrow="Danh sách phim"
+                title={typeNames[type]}
+                description="Khám phá những tựa phim được cập nhật từ nguồn bạn đang chọn."
+                meta={totalItems > 0 ? `${totalItems.toLocaleString()} phim` : undefined}
+            />
 
-            {movies.length > 0 ? (
+            {error ? (
+                <EmptyState
+                    icon={<RefreshCw className="h-5 w-5" />}
+                    title="Không thể tải danh sách phim"
+                    description="Kết nối tới nguồn phim đang gặp gián đoạn. Bạn có thể thử tải lại trang."
+                    action={
+                        <button type="button" onClick={() => window.location.reload()} className="button-secondary">
+                            Thử lại
+                        </button>
+                    }
+                />
+            ) : movies.length > 0 ? (
                 <>
                     <MovieGrid movies={movies} />
                     <Pagination
@@ -73,9 +90,11 @@ export default function MovieListPage({ params, searchParams }: Props) {
                     />
                 </>
             ) : (
-                <div className="text-center py-12">
-                    <p className="text-foreground-muted">Không có phim nào</p>
-                </div>
+                <EmptyState
+                    icon={<Film className="h-5 w-5" />}
+                    title="Chưa có phim trong danh sách này"
+                    description="Nội dung có thể đang được cập nhật. Hãy quay lại sau."
+                />
             )}
         </div>
     );

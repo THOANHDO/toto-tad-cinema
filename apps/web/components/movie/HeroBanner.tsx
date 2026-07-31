@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Play, Info, Star } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Info, Play } from "lucide-react";
 import { getImageUrl } from "@/lib/api/ophim";
 import type { Movie } from "@/types/movie";
 
@@ -12,105 +12,98 @@ interface HeroBannerProps {
 }
 
 export default function HeroBanner({ movie }: HeroBannerProps) {
+    const shouldReduceMotion = useReducedMotion();
+
     return (
-        <div className="relative h-[60vh] md:h-[70vh] lg:h-[80vh] overflow-hidden">
-            {/* Background Image */}
+        <section
+            className="relative min-h-[34rem] overflow-hidden sm:min-h-[38rem] md:h-[66svh] md:min-h-[36rem] md:max-h-[44rem] lg:h-[68svh] lg:max-h-[48rem] xl:h-[76vh] xl:min-h-[42rem] xl:max-h-[54rem]"
+            aria-label={`Phim nổi bật: ${movie.name}`}
+        >
             <div className="absolute inset-0">
                 <Image
                     src={getImageUrl(movie.poster_url || movie.thumb_url)}
-                    alt={movie.name}
+                    alt=""
                     fill
                     priority
                     sizes="100vw"
-                    className="object-cover object-center"
+                    className="object-cover object-[62%_center] sm:object-center md:object-[60%_center] lg:object-center"
                 />
-                {/* Gradient overlays */}
-                <div className="absolute inset-0 bg-gradient-to-r from-black via-black/60 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,4,6,0.96)_0%,rgba(3,4,6,0.78)_32%,rgba(3,4,6,0.26)_68%,rgba(3,4,6,0.2)_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,4,6,0.52)_0%,transparent_30%,transparent_58%,var(--background)_100%)]" />
+                <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-background to-transparent" />
             </div>
 
-            {/* Content */}
-            <div className="absolute inset-0 flex items-end md:items-center">
-                <div className="container mx-auto px-4 pb-12 md:pb-0">
-                    <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6 }}
-                        className="max-w-2xl"
-                    >
-                        {/* Badges */}
-                        <div className="flex items-center gap-3 mb-4">
-                            {movie.quality && (
-                                <span className="px-2 py-1 bg-primary text-white text-xs font-semibold rounded">
-                                    {movie.quality}
-                                </span>
-                            )}
-                            {movie.year && (
-                                <span className="text-foreground-secondary text-sm">{movie.year}</span>
-                            )}
-                            {movie.lang && (
-                                <span className="text-foreground-secondary text-sm">{movie.lang}</span>
-                            )}
-                            {movie.time && (
-                                <span className="text-foreground-secondary text-sm">{movie.time}</span>
-                            )}
-                        </div>
+            <div className="site-container relative flex h-full min-h-[34rem] items-end pb-20 pt-28 sm:min-h-[38rem] md:min-h-[36rem] md:pb-20 md:pt-24 lg:items-center lg:pb-16 xl:min-h-[42rem] xl:pb-20 xl:pt-28">
+                <motion.div
+                    initial={shouldReduceMotion ? false : { opacity: 0, y: 24 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.55, ease: [0.2, 0.8, 0.2, 1] }}
+                    className="max-w-[38rem] md:max-w-[32rem] lg:max-w-[36rem] xl:max-w-[38rem]"
+                >
+                    <p className="eyebrow mb-4">Nổi bật hôm nay</p>
 
-                        {/* Title */}
-                        <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-2 text-white">
-                            {movie.name}
-                        </h1>
-                        <p className="text-lg md:text-xl text-foreground-secondary mb-2">
+                    <h1 className="max-w-[14ch] text-4xl font-extrabold leading-[0.98] tracking-[-0.055em] text-white sm:text-5xl md:text-[clamp(2.75rem,5.5vw,4rem)] lg:text-[clamp(3.25rem,4.5vw,4.5rem)] xl:text-7xl">
+                        {movie.name}
+                    </h1>
+
+                    {movie.origin_name && (
+                        <p className="mt-3 line-clamp-1 text-base font-medium text-white/72 sm:text-lg">
                             {movie.origin_name}
                         </p>
+                    )}
 
-                        {/* Episode info */}
-                        {movie.episode_current && (
-                            <p className="text-foreground-muted mb-4">{movie.episode_current}</p>
+                    <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-white/75">
+                        {movie.quality && (
+                            <span className="rounded-md border border-white/15 bg-white/10 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+                                {movie.quality}
+                            </span>
                         )}
+                        {movie.year > 0 && <span className="font-semibold text-white">{movie.year}</span>}
+                        {movie.lang && <span>{movie.lang}</span>}
+                        {movie.time && <span>{movie.time}</span>}
+                    </div>
 
-                        {/* Categories */}
-                        {movie.category && movie.category.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-6">
-                                {movie.category.slice(0, 5).map((cat) => (
-                                    <Link
-                                        key={cat.slug}
-                                        href={`/the-loai/${cat.slug}`}
-                                        prefetch={false}
-                                        className="px-3 py-1 bg-white/10 hover:bg-white/20 text-sm rounded-full transition-colors"
-                                    >
-                                        {cat.name}
-                                    </Link>
-                                ))}
-                            </div>
-                        )}
+                    {movie.episode_current && (
+                        <p className="mt-4 line-clamp-2 max-w-lg text-sm leading-6 text-foreground-secondary sm:text-base">
+                            {movie.episode_current}
+                        </p>
+                    )}
 
-                        {/* Action buttons */}
-                        <div className="flex flex-wrap gap-4">
-                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    {movie.category && movie.category.length > 0 && (
+                        <div className="mt-5 hidden flex-wrap items-center gap-2 sm:flex">
+                            {movie.category.slice(0, 4).map((category) => (
                                 <Link
-                                    href={`/phim/${movie.slug}`}
+                                    key={category.slug}
+                                    href={`/the-loai/${category.slug}`}
                                     prefetch={false}
-                                    className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-hover text-white font-semibold rounded-lg transition-colors shadow-lg shadow-primary/30"
+                                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-medium text-white/76 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
                                 >
-                                    <Play className="w-5 h-5" fill="white" />
-                                    Xem ngay
+                                    {category.name}
                                 </Link>
-                            </motion.div>
-                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                <Link
-                                    href={`/phim/${movie.slug}`}
-                                    prefetch={false}
-                                    className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-lg transition-colors"
-                                >
-                                    <Info className="w-5 h-5" />
-                                    Thông tin
-                                </Link>
-                            </motion.div>
+                            ))}
                         </div>
-                    </motion.div>
-                </div>
+                    )}
+
+                    <div className="mt-7 flex flex-wrap gap-3">
+                        <Link
+                            href={`/phim/${movie.slug}`}
+                            prefetch={false}
+                            className="button-primary min-w-32"
+                        >
+                            <Play className="h-4 w-4 fill-current" />
+                            Xem ngay
+                        </Link>
+                        <Link
+                            href={`/phim/${movie.slug}`}
+                            prefetch={false}
+                            className="button-secondary min-w-32"
+                        >
+                            <Info className="h-4 w-4" />
+                            Chi tiết
+                        </Link>
+                    </div>
+                </motion.div>
             </div>
-        </div>
+        </section>
     );
 }

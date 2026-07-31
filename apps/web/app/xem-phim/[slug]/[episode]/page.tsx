@@ -3,7 +3,7 @@
 import { use } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, Home } from "lucide-react";
+import { ChevronRight, Home, PlayCircle } from "lucide-react";
 import { getMovieDetail, getMoviePeoples, getMovieDetailNguonC, getMovieDetailPhimApi } from "@/lib/api/ophim";
 import VideoPlayer from "./VideoPlayer";
 import EpisodeSelector from "./EpisodeSelector";
@@ -77,24 +77,34 @@ export default function WatchPage({ params, searchParams }: Props) {
     const nextEpisode = serverData[currentEpisodeIndex + 1];
 
     return (
-        <div className="min-h-screen bg-black">
-            {/* Breadcrumb */}
-            <div className="container mx-auto px-4 py-4">
-                <nav className="flex items-center gap-2 text-sm text-foreground-secondary">
-                    <Link href="/" className="hover:text-white transition-colors">
-                        <Home className="w-4 h-4" />
+        <div className="min-h-screen bg-[#07080a] pb-16 pt-20 md:pt-24">
+            <div className="site-container">
+                <nav className="flex items-center gap-2 overflow-hidden text-xs text-foreground-muted sm:text-sm" aria-label="Đường dẫn">
+                    <Link href="/" className="flex-none transition-colors hover:text-white" aria-label="Trang chủ">
+                        <Home className="h-4 w-4" />
                     </Link>
-                    <ChevronRight className="w-4 h-4" />
-                    <Link href={`/phim/${slug}`} className="hover:text-white transition-colors line-clamp-1">
+                    <ChevronRight className="h-4 w-4 flex-none" />
+                    <Link href={`/phim/${slug}`} className="line-clamp-1 transition-colors hover:text-white">
                         {movie.name}
                     </Link>
-                    <ChevronRight className="w-4 h-4" />
-                    <span className="text-white">Tập {currentEpisode.name}</span>
+                    <ChevronRight className="h-4 w-4 flex-none" />
+                    <span className="flex-none text-white">Tập {currentEpisode.name}</span>
                 </nav>
-            </div>
 
-            {/* Video Player */}
-            <div className="container mx-auto px-4">
+                <div className="mb-5 mt-6 flex items-start gap-3">
+                    <div className="mt-1 flex h-9 w-9 flex-none items-center justify-center rounded-full bg-primary/12 text-primary">
+                        <PlayCircle className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                            Đang phát · Tập {currentEpisode.name}
+                        </p>
+                        <h1 className="mt-1 text-xl font-bold tracking-[-0.025em] text-white sm:text-2xl">
+                            {movie.name}
+                        </h1>
+                    </div>
+                </div>
+
                 <VideoPlayer
                     movieSlug={slug}
                     movieName={movie.name}
@@ -112,22 +122,20 @@ export default function WatchPage({ params, searchParams }: Props) {
                 />
             </div>
 
-            {/* Episode selector */}
-            <div className="container mx-auto px-4 py-6 border-t border-white/5">
-                <h2 className="text-xl font-black mb-6 flex items-center gap-3">
-                    <div className="w-1.5 h-6 bg-primary rounded-full" />
-                    Chọn tập
-                </h2>
+            <section className="site-container mt-8">
+                <div className="surface-panel p-5 sm:p-7">
+                    <p className="eyebrow">Danh sách phát</p>
+                    <h2 className="mb-6 mt-2 text-2xl font-bold tracking-tight text-white">Chọn tập</h2>
                 <EpisodeSelector
                     episodes={episodes}
                     movieSlug={slug}
                     currentEpisode={episode}
                     initialServerIndex={currentServerIndex}
                 />
-            </div>
+                </div>
+            </section>
 
-            {/* Movie Info Details Section */}
-            <div id="movie-info" className="container mx-auto px-4 scroll-mt-20 border-t border-white/5">
+            <div id="movie-info" className="site-container scroll-mt-24">
                 <MovieInfoDetails movie={movie} peoples={peoples} />
             </div>
         </div>

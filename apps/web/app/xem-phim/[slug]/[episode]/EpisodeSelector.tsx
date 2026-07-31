@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Episode } from "@/types/movie";
+import { Server } from "lucide-react";
 
 interface EpisodeSelectorProps {
     episodes: Episode[];
@@ -24,18 +25,24 @@ export default function EpisodeSelector({
     const currentServer = episodes[activeServer];
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-5">
             {/* Server tabs */}
             {episodes.length > 1 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="mr-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                        <Server className="h-4 w-4" />
+                        Máy chủ
+                    </span>
                     {episodes.map((server, index) => (
                         <button
                             key={index}
+                            type="button"
                             onClick={() => setActiveServer(index)}
-                            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeServer === index
-                                    ? "bg-primary text-white"
-                                    : "bg-white/10 text-foreground-secondary hover:bg-white/20"
+                            className={`min-h-10 rounded-lg border px-4 py-2 text-sm font-medium transition-colors md:min-h-11 xl:min-h-10 ${activeServer === index
+                                    ? "border-primary bg-primary text-[var(--primary-text)]"
+                                    : "border-border bg-background text-foreground-secondary hover:border-border-strong hover:text-white"
                                 }`}
+                            aria-pressed={activeServer === index}
                         >
                             {server.server_name}
                         </button>
@@ -44,7 +51,7 @@ export default function EpisodeSelector({
             )}
 
             {/* Episode grid */}
-            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 xl:grid-cols-16 gap-2">
+            <div className="grid grid-cols-4 gap-2 min-[460px]:grid-cols-5 sm:grid-cols-7 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-16">
                 {currentServer?.server_data?.map((ep: { slug: string; name: string }) => {
                     const isCurrent = ep.slug === currentEpisode;
                     
@@ -52,7 +59,7 @@ export default function EpisodeSelector({
                         return (
                             <div
                                 key={ep.slug}
-                                className="px-3 py-2 text-center text-sm font-medium rounded-lg bg-primary text-white cursor-default"
+                                className="flex min-h-11 cursor-default items-center justify-center rounded-lg border border-primary bg-primary px-3 py-2 text-center text-sm font-semibold text-[var(--primary-text)]"
                             >
                                 {ep.name}
                             </div>
@@ -64,7 +71,7 @@ export default function EpisodeSelector({
                             key={ep.slug}
                             href={`/xem-phim/${movieSlug}/${ep.slug}?sv=${activeServer}`}
                             prefetch={false}
-                            className="px-3 py-2 text-center text-sm font-medium rounded-lg transition-colors bg-white/10 hover:bg-white/20 text-foreground-secondary hover:text-white"
+                            className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-center text-sm font-medium text-foreground-secondary transition-colors hover:border-border-strong hover:bg-background-tertiary hover:text-white"
                         >
                             {ep.name}
                         </Link>
@@ -74,4 +81,3 @@ export default function EpisodeSelector({
         </div>
     );
 }
-

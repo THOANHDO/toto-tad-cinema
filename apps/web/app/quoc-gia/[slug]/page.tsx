@@ -4,8 +4,11 @@ import { use } from "react";
 import { getMoviesByCountry } from "@/lib/api/unified";
 import MovieGrid from "@/components/movie/MovieGrid";
 import Pagination from "@/components/ui/Pagination";
-import SplashScreen from "@/components/ui/SplashScreen";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
+import { MovieGridSkeleton } from "@/components/ui/Skeleton";
 import { useMovieData } from "@/lib/hooks/use-movie-data";
+import { Globe2, RefreshCw } from "lucide-react";
 
 interface Props {
     params: Promise<{ slug: string }>;
@@ -17,13 +20,18 @@ export default function CountryPage({ params, searchParams }: Props) {
     const { page } = use(searchParams);
     const currentPage = parseInt(page || "1", 10);
 
-    const { data, loading } = useMovieData(
+    const { data, loading, error } = useMovieData(
         `country-${slug}-p${currentPage}`,
         () => getMoviesByCountry(slug, currentPage)
     );
 
     if (loading) {
-        return <SplashScreen />;
+        return (
+            <div className="page-shell">
+                <div className="skeleton mb-10 h-14 w-72 rounded-xl" />
+                <MovieGridSkeleton />
+            </div>
+        );
     }
 
     const movies = data?.data?.items || [];
@@ -33,17 +41,26 @@ export default function CountryPage({ params, searchParams }: Props) {
     const title = data?.data?.titlePage || `Phim ${slug.replace(/-/g, " ")}`;
 
     return (
-        <div className="container mx-auto px-4 py-8">
-            <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl md:text-3xl font-bold capitalize">{title}</h1>
-                {totalItems > 0 && (
-                    <p className="text-foreground-secondary text-sm">
-                        {totalItems.toLocaleString()} phim
-                    </p>
-                )}
-            </div>
+        <div className="page-shell">
+            <PageHeader
+                eyebrow="Điện ảnh thế giới"
+                title={title}
+                description="Khám phá phim và chương trình nổi bật theo quốc gia sản xuất."
+                meta={totalItems > 0 ? `${totalItems.toLocaleString()} phim` : undefined}
+            />
 
-            {movies.length > 0 ? (
+            {error ? (
+                <EmptyState
+                    icon={<RefreshCw className="h-5 w-5" />}
+                    title="Không thể tải danh sách quốc gia"
+                    description="Nguồn phim chưa phản hồi. Vui lòng thử lại."
+                    action={
+                        <button type="button" onClick={() => window.location.reload()} className="button-secondary">
+                            Thử lại
+                        </button>
+                    }
+                />
+            ) : movies.length > 0 ? (
                 <>
                     <MovieGrid movies={movies} />
                     <Pagination
@@ -53,9 +70,11 @@ export default function CountryPage({ params, searchParams }: Props) {
                     />
                 </>
             ) : (
-                <div className="text-center py-12">
-                    <p className="text-foreground-muted">Không có phim nào từ quốc gia này</p>
-                </div>
+                <EmptyState
+                    icon={<Globe2 className="h-5 w-5" />}
+                    title="Chưa có phim từ quốc gia này"
+                    description="Hãy thử một quốc gia khác hoặc quay lại khi nội dung được cập nhật."
+                />
             )}
         </div>
     );

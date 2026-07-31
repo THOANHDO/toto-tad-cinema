@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { Server } from "lucide-react";
 import type { Episode } from "@/types/movie";
 import { useStore } from "@/lib/store/useStore";
 
@@ -21,18 +21,24 @@ export default function EpisodeList({ episodes, movieSlug }: EpisodeListProps) {
     const currentServer = episodes[activeServer];
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-5">
             {/* Server tabs */}
             {episodes.length > 1 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="mr-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                        <Server className="h-4 w-4" />
+                        Máy chủ
+                    </span>
                     {episodes.map((server, index) => (
                         <button
                             key={index}
+                            type="button"
                             onClick={() => setActiveServer(index)}
-                            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeServer === index
-                                    ? "bg-primary text-white"
-                                    : "bg-white/10 text-foreground-secondary hover:bg-white/20"
+                            className={`min-h-10 rounded-lg border px-4 py-2 text-sm font-medium transition-colors md:min-h-11 xl:min-h-10 ${activeServer === index
+                                    ? "border-primary bg-primary text-[var(--primary-text)]"
+                                    : "border-border bg-background text-foreground-secondary hover:border-border-strong hover:text-white"
                                 }`}
+                            aria-pressed={activeServer === index}
                         >
                             {server.server_name}
                         </button>
@@ -41,7 +47,7 @@ export default function EpisodeList({ episodes, movieSlug }: EpisodeListProps) {
             )}
 
             {/* Episode grid */}
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-9 xl:grid-cols-12">
                 {currentServer?.server_data?.map((ep) => {
                     const isWatching = progress?.episode === ep.slug;
                     return (
@@ -49,9 +55,9 @@ export default function EpisodeList({ episodes, movieSlug }: EpisodeListProps) {
                             key={ep.slug}
                             href={`/xem-phim/${movieSlug}/${ep.slug}?sv=${activeServer}`}
                             prefetch={false}
-                            className={`relative px-3 py-2 text-center text-sm font-medium rounded-lg transition-colors ${isWatching
-                                    ? "bg-primary text-white ring-2 ring-primary ring-offset-2 ring-offset-background"
-                                    : "bg-white/10 hover:bg-white/20 text-foreground-secondary hover:text-white"
+                            className={`relative flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-medium transition-colors ${isWatching
+                                    ? "border-primary bg-primary text-[var(--primary-text)] ring-2 ring-primary/30 ring-offset-2 ring-offset-background-secondary"
+                                    : "border-border bg-background text-foreground-secondary hover:border-border-strong hover:bg-background-tertiary hover:text-white"
                                 }`}
                         >
                             {ep.name}

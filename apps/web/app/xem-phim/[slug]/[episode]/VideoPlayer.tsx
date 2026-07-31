@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Server } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "@/lib/store/useStore";
 import { useProfileStore } from "@/lib/store/useProfileStore";
@@ -345,7 +345,7 @@ export default function VideoPlayer({
     return (
         <div className="relative">
             {/* 16:9 video container */}
-            <div className="relative aspect-video bg-black rounded-lg overflow-hidden group shadow-2xl border border-white/5">
+            <div className="group relative aspect-video overflow-hidden rounded-[var(--radius-lg)] border border-white/8 bg-black shadow-[var(--shadow-lg)]">
 
                 {/* Loading spinner — shown during Plyr mode or while checking sources */}
                 <AnimatePresence>
@@ -354,15 +354,15 @@ export default function VideoPlayer({
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="absolute inset-0 z-20 flex items-center justify-center bg-black backdrop-blur-sm"
+                            className="absolute inset-0 z-20 flex items-center justify-center bg-black/92 backdrop-blur-sm"
                         >
                             <div className="relative flex flex-col items-center gap-4">
                                 <div className="relative">
-                                    <div className="w-16 h-16 border-4 border-primary/20 rounded-full" />
-                                    <div className="absolute inset-0 w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(225,29,72,0.4)]" />
+                                    <div className="h-12 w-12 rounded-full border-2 border-primary/20" />
+                                    <div className="absolute inset-0 h-12 w-12 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                                 </div>
                                 {isCheckingSources && (
-                                    <p className="text-primary text-sm font-medium tracking-wide animate-pulse">Đang tìm nguồn phát tốt nhất...</p>
+                                    <p className="animate-pulse text-sm font-medium text-foreground-secondary">Đang chuẩn bị nguồn phát tốt nhất…</p>
                                 )}
                             </div>
                         </motion.div>
@@ -373,7 +373,8 @@ export default function VideoPlayer({
                     /* ── Embed / Dự phòng mode ── */
                     <iframe
                         src={currentEmbedUrl}
-                        className="w-full h-full"
+                        className="h-full w-full"
+                        title={`${movieName} - ${episodeName}`}
                         allowFullScreen
                         allow="autoplay; encrypted-media; picture-in-picture"
                         referrerPolicy="no-referrer-when-downgrade"
@@ -392,20 +393,21 @@ export default function VideoPlayer({
                     </div>
                 ) : !isCheckingSources ? (
                     /* ── No source available ── */
-                    <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 z-10">
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-background-secondary">
                         <div className="text-center space-y-2">
-                            <p className="text-foreground-secondary font-medium">Nguồn phát không khả dụng</p>
-                            <p className="text-xs text-foreground-muted">Vui lòng thử lại sau hoặc chọn tập khác</p>
+                            <p className="font-medium text-foreground">Nguồn phát không khả dụng</p>
+                            <p className="text-xs text-foreground-muted">Vui lòng chọn máy chủ khác hoặc thử một tập khác.</p>
                         </div>
                     </div>
                 ) : null}
 
                 {/* Next episode button — hiển thị khi hover, ẩn khi đang load */}
                 {!isCheckingSources && nextEpisodeSlug && (
-                    <div className={`absolute ${useEmbed ? 'bottom-4' : 'bottom-16'} right-4 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-200`}>
+                    <div className={`absolute ${useEmbed ? 'bottom-4' : 'bottom-16'} right-4 z-30 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:hidden xl:block`}>
                         <button
                             onClick={() => router.push(`/xem-phim/${movieSlug}/${nextEpisodeSlug}${serverIndex !== undefined ? `?sv=${serverIndex}` : ''}`)}
-                            className="flex items-center gap-1.5 bg-black/70 hover:bg-black/90 backdrop-blur-sm text-white text-sm font-semibold px-4 py-2 rounded-xl border border-white/20 hover:border-white/40 transition-all shadow-xl"
+                            type="button"
+                            className="flex items-center gap-1.5 rounded-xl border border-white/20 bg-black/75 px-4 py-2 text-sm font-semibold text-white shadow-xl backdrop-blur-sm transition-colors hover:border-white/35 hover:bg-black/90"
                         >
                             Tập tiếp theo
                             <ChevronRight className="w-4 h-4" />
@@ -414,67 +416,109 @@ export default function VideoPlayer({
                 )}
             </div>
 
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <button
+                    type="button"
+                    disabled={!prevEpisodeSlug}
+                    onClick={() => prevEpisodeSlug && router.push(`/xem-phim/${movieSlug}/${prevEpisodeSlug}${serverIndex !== undefined ? `?sv=${serverIndex}` : ''}`)}
+                    className="button-ghost disabled:opacity-35"
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                    Tập trước
+                </button>
+                <button
+                    type="button"
+                    disabled={!nextEpisodeSlug}
+                    onClick={() => nextEpisodeSlug && router.push(`/xem-phim/${movieSlug}/${nextEpisodeSlug}${serverIndex !== undefined ? `?sv=${serverIndex}` : ''}`)}
+                    className="button-secondary disabled:opacity-35"
+                >
+                    Tập tiếp theo
+                    <ChevronRight className="h-4 w-4" />
+                </button>
+            </div>
+
             {/* Controls bar — Redundancy options */}
-            <div className="mt-6 flex flex-wrap items-center justify-end p-4 bg-neutral-900/50 backdrop-blur-xl rounded-2xl border border-white/5 shadow-xl gap-3">
-                <span className="text-[10px] font-black tracking-widest text-foreground-muted mr-auto px-2 uppercase">Nguồn phát dự phòng</span>
+            <div className="surface-panel mt-5 flex flex-wrap items-center gap-2 p-4">
+                <span className="mb-1 flex w-full items-center gap-2 text-xs font-semibold text-foreground-secondary sm:mb-0 sm:mr-auto sm:w-auto md:mb-1 md:mr-0 md:w-full lg:mb-0 lg:mr-auto lg:w-auto">
+                    <Server className="h-4 w-4 text-primary" />
+                    Đổi máy chủ phát
+                </span>
                 
                 {m3u8Url && (
                     <button
+                        type="button"
                         onClick={() => switchToM3u8(m3u8Url, "op-m3u8")}
-                        className={`px-4 py-2 border rounded-xl text-xs font-black tracking-widest transition-all flex items-center gap-2 ${activeSource === "op-m3u8" ? "bg-primary/20 border-primary text-primary" : "bg-white/5 border-white/10 text-foreground-muted hover:bg-white/10"}`}
+                        className={`flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors md:min-h-11 xl:min-h-9 ${activeSource === "op-m3u8" ? "border-primary bg-primary/12 text-primary" : "border-border bg-background text-foreground-muted hover:border-border-strong hover:text-white"}`}
+                        aria-pressed={activeSource === "op-m3u8"}
+                        title="OPhim M3U8"
                     >
                         <span className={`w-2 h-2 rounded-full ${availability['op-m3u8'] === false ? 'bg-red-500' : 'bg-green-500'}`} />
-                        OP-M3U8
+                        Máy chủ chính
                     </button>
                 )}
 
                 {embedUrl && (
                     <button
+                        type="button"
                         onClick={() => switchToEmbed(embedUrl, "op-embed")}
-                        className={`px-4 py-2 border rounded-xl text-xs font-black tracking-widest transition-all flex items-center gap-2 ${activeSource === "op-embed" ? "bg-primary/20 border-primary text-primary" : "bg-white/5 border-white/10 text-foreground-muted hover:bg-white/10"}`}
+                        className={`flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors md:min-h-11 xl:min-h-9 ${activeSource === "op-embed" ? "border-primary bg-primary/12 text-primary" : "border-border bg-background text-foreground-muted hover:border-border-strong hover:text-white"}`}
+                        aria-pressed={activeSource === "op-embed"}
+                        title="OPhim Embed"
                     >
                         <span className={`w-2 h-2 rounded-full ${availability['op-embed'] === false ? 'bg-red-500' : 'bg-green-500'}`} />
-                        OP-EMBED
+                        Chính dự phòng
                     </button>
                 )}
 
                 {ncM3u8 && (
                     <button
+                        type="button"
                         onClick={() => switchToM3u8(ncM3u8, "nc-m3u8")}
-                        className={`px-4 py-2 border rounded-xl text-xs font-black tracking-widest transition-all flex items-center gap-2 ${activeSource === "nc-m3u8" ? "bg-primary/20 border-primary text-primary" : "bg-white/5 border-white/10 text-foreground-muted hover:bg-white/10"}`}
+                        className={`flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors md:min-h-11 xl:min-h-9 ${activeSource === "nc-m3u8" ? "border-primary bg-primary/12 text-primary" : "border-border bg-background text-foreground-muted hover:border-border-strong hover:text-white"}`}
+                        aria-pressed={activeSource === "nc-m3u8"}
+                        title="NguonC M3U8"
                     >
                         <span className={`w-2 h-2 rounded-full ${availability['nc-m3u8'] === false ? 'bg-red-500' : 'bg-green-500'}`} />
-                        NC-M3U8
+                        Máy chủ 2
                     </button>
                 )}
 
                 {ncEmbed && (
                     <button
+                        type="button"
                         onClick={() => switchToEmbed(ncEmbed, "nc-embed")}
-                        className={`px-4 py-2 border rounded-xl text-xs font-black tracking-widest transition-all flex items-center gap-2 ${activeSource === "nc-embed" ? "bg-primary/20 border-primary text-primary" : "bg-white/5 border-white/10 text-foreground-muted hover:bg-white/10"}`}
+                        className={`flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors md:min-h-11 xl:min-h-9 ${activeSource === "nc-embed" ? "border-primary bg-primary/12 text-primary" : "border-border bg-background text-foreground-muted hover:border-border-strong hover:text-white"}`}
+                        aria-pressed={activeSource === "nc-embed"}
+                        title="NguonC Embed"
                     >
                         <span className={`w-2 h-2 rounded-full ${availability['nc-embed'] === false ? 'bg-red-500' : 'bg-green-500'}`} />
-                        NC-EMBED
+                        Máy chủ 2 dự phòng
                     </button>
                 )}
 
                 {paM3u8 && (
                     <button
+                        type="button"
                         onClick={() => switchToM3u8(paM3u8, "pa-m3u8")}
-                        className={`px-4 py-2 border rounded-xl text-xs font-black tracking-widest transition-all flex items-center gap-2 ${activeSource === "pa-m3u8" ? "bg-primary/20 border-primary text-primary" : "bg-white/5 border-white/10 text-foreground-muted hover:bg-white/10"}`}
+                        className={`flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors md:min-h-11 xl:min-h-9 ${activeSource === "pa-m3u8" ? "border-primary bg-primary/12 text-primary" : "border-border bg-background text-foreground-muted hover:border-border-strong hover:text-white"}`}
+                        aria-pressed={activeSource === "pa-m3u8"}
+                        title="PhimApi M3U8"
                     >
                         <span className={`w-2 h-2 rounded-full ${availability['pa-m3u8'] === false ? 'bg-red-500' : 'bg-green-500'}`} />
-                        PA-M3U8
+                        Máy chủ 3
                     </button>
                 )}
 
                 {paEmbed && (
                     <button
+                        type="button"
                         onClick={() => switchToEmbed(paEmbed, "pa-embed")}
-                        className={`px-4 py-2 border rounded-xl text-xs font-black tracking-widest transition-all flex items-center gap-2 ${activeSource === "pa-embed" ? "bg-primary/20 border-primary text-primary" : "bg-white/5 border-white/10 text-foreground-muted hover:bg-white/10"}`}
+                        className={`flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors md:min-h-11 xl:min-h-9 ${activeSource === "pa-embed" ? "border-primary bg-primary/12 text-primary" : "border-border bg-background text-foreground-muted hover:border-border-strong hover:text-white"}`}
+                        aria-pressed={activeSource === "pa-embed"}
+                        title="PhimApi Embed"
                     >
                         <span className={`w-2 h-2 rounded-full ${availability['pa-embed'] === false ? 'bg-red-500' : 'bg-green-500'}`} />
-                        PA-EMBED
+                        Máy chủ 3 dự phòng
                     </button>
                 )}
             </div>

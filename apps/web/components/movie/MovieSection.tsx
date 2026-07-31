@@ -14,17 +14,17 @@ interface MovieSectionProps {
 
 export default function MovieSection({ title, movies, href, showProgress = true }: MovieSectionProps) {
     return (
-        <section className="py-6 md:py-8">
-            <div className="flex items-center justify-between mb-4 md:mb-6">
-                <h2 className="text-xl md:text-2xl font-bold">{title}</h2>
+        <section className="py-8 md:py-10">
+            <div className="mb-5 flex items-end justify-between gap-4 md:mb-6">
+                <h2 className="text-xl font-bold tracking-[-0.025em] text-foreground md:text-2xl">{title}</h2>
                 {href && (
                     <Link
                         href={href}
                         prefetch={false}
-                        className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover transition-colors group"
+                        className="group flex items-center gap-1 text-sm font-semibold text-foreground-secondary transition-colors hover:text-white"
                     >
                         Xem tất cả
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5" />
                     </Link>
                 )}
             </div>
