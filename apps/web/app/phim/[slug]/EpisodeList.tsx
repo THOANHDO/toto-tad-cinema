@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Server } from "lucide-react";
 import type { Episode } from "@/types/movie";
-import { useStore } from "@/lib/store/useStore";
+import { useAccountDataStore } from "@/lib/store/useAccountDataStore";
 
 interface EpisodeListProps {
     episodes: Episode[];
@@ -13,8 +13,7 @@ interface EpisodeListProps {
 
 export default function EpisodeList({ episodes, movieSlug }: EpisodeListProps) {
     const [activeServer, setActiveServer] = useState(0);
-    const { getProgress } = useStore();
-    const progress = getProgress(movieSlug);
+    const progress = useAccountDataStore((state) => state.watchProgress[movieSlug] ?? null);
 
     if (!episodes || episodes.length === 0) return null;
 

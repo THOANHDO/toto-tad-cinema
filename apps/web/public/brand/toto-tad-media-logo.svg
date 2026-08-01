@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 310 100" role="img" aria-labelledby="title description">
-  <title id="title">ToTo TAD Media</title>
-  <desc id="description">Mascot đeo kính tròn cùng wordmark ToTo TAD Media</desc>
+  <title id="title">ToTo TAD Cinema</title>
+  <desc id="description">Mascot đeo kính tròn cùng wordmark ToTo TAD Cinema</desc>
 
   <g transform="translate(3 2) scale(.96)" stroke="#17191E" stroke-linecap="round" stroke-linejoin="round">
     <path
@@ -34,6 +34,6 @@
   >
     <text x="105" y="48" fill="#E73343" font-size="39" letter-spacing="-2" stroke-width="2.5">ToTo</text>
     <text x="196" y="48" fill="#FFF3E6" font-size="39" letter-spacing="-1.5" stroke-width="2.5">TAD</text>
-    <text x="108" y="73" fill="#FFF3E6" font-size="13" letter-spacing="8" stroke-width="1.6">MEDIA</text>
+    <text x="108" y="73" fill="#FFF3E6" font-size="13" letter-spacing="6" stroke-width="1.6">CINEMA</text>
   </g>
 </svg>

@@ -2,7 +2,7 @@
 
 import { Heart } from "lucide-react";
 import { motion } from "framer-motion";
-import { useProfileStore } from "@/lib/store/useProfileStore";
+import { useAccountDataStore } from "@/lib/store/useAccountDataStore";
 import { toggleFavorite } from "@/app/yeu-thich/actions";
 import type { MovieDetail } from "@/types/movie";
 
@@ -11,7 +11,7 @@ interface FavoriteButtonProps {
 }
 
 export default function FavoriteButton({ movie }: FavoriteButtonProps) {
-    const { currentProfile, favoriteSlugs, toggleFavoriteSlug } = useProfileStore();
+    const { favoriteSlugs, toggleFavoriteSlug } = useAccountDataStore();
     const isSupabaseEnabled = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
     if (!isSupabaseEnabled) return null;
@@ -19,16 +19,11 @@ export default function FavoriteButton({ movie }: FavoriteButtonProps) {
     const isLiked = favoriteSlugs.includes(movie.slug);
 
     const handleClick = async () => {
-        if (!currentProfile?.id) {
-            console.warn('Vui lòng chọn Profile để thực hiện tính năng này');
-            return;
-        }
-
         // Toggle local state for immediate feedback
         toggleFavoriteSlug(movie.slug);
 
         // Sync with Supabase
-        const result = await toggleFavorite(currentProfile.id, {
+        const result = await toggleFavorite({
             movie_slug: movie.slug,
             movie_title: movie.name,
             poster_url: movie.thumb_url

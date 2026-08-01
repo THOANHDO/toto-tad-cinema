@@ -6,12 +6,20 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test:auth": "tsx --test apps/web/lib/auth/redirect.test.ts",
+    "create-private-user": "tsx scripts/create-private-user.ts",
     "update-db": "echo 'Syncing types...'",
     "setup": "sh scripts/setup-hooks.sh",
     "build:cloudflare": "pnpm build && pnpm --filter silent-ride run pages:build"
   },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.99.2"
+  },
   "devDependencies": {
+    "dotenv": "^16.6.1",
     "@opennextjs/cloudflare": "^1.19.1",
+    "tsx": "^4.21.0",
     "turbo": "^2.0.0",
     "vercel": "^51.1.0",
     "wrangler": "^3"

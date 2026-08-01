@@ -1,79 +1,65 @@
-'use server'
+"use server";
 
-import { createServerSupabaseClient } from '@repo/database'
-import { revalidatePath } from 'next/cache'
-import { watchHistorySchema, type WatchHistoryInput } from './schema'
+import { requireActiveAccount } from "@/lib/auth/server";
+import { createServerSupabaseClient } from "@repo/database/server";
+import { revalidatePath } from "next/cache";
+import { watchHistorySchema, type WatchHistoryInput } from "./schema";
 
-export async function updateWatchHistory(profileId: string, historyData: WatchHistoryInput) {
-  if (!profileId) return
-  
-  // Validate data
-  const validated = watchHistorySchema.safeParse(historyData)
-  if (!validated.success) {
-    console.error('Invalid history data:', validated.error.format())
-    return
-  }
-  
-  const data = validated.data
-  const supabase = await createServerSupabaseClient()
-  if (!supabase) return
+export async function updateWatchHistory(historyData: WatchHistoryInput) {
+  const { user } = await requireActiveAccount("/lich-su");
+  const validated = watchHistorySchema.safeParse(historyData);
+  if (!validated.success) return { error: "Dữ liệu lịch sử không hợp lệ" };
 
-  // Verify profile exists
-  const { data: profile } = await supabase
-    .from('sr_profiles')
-    .select('id')
-    .eq('id', profileId)
-    .maybeSingle()
-  
-  if (!profile) return
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return { error: "Database not configured" };
+
+  const { error } = await supabase.from("sr_watch_history").upsert(
+    {
+      user_id: user.id,
+      movie_slug: validated.data.movie_slug,
+      movie_title: validated.data.movie_title,
+      poster_url: validated.data.poster_url,
+      episode_slug: validated.data.episode_slug,
+      episode_name: validated.data.episode_name,
+      duration: validated.data.duration,
+      playback_time: validated.data.playback_time,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,movie_slug" },
+  );
+
+  if (error) return { error: "Không thể cập nhật lịch sử xem" };
+
+  revalidatePath("/lich-su");
+  return { success: true };
+}
+
+export async function getWatchHistory() {
+  const { user } = await requireActiveAccount("/lich-su");
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("sr_watch_history")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
+
+  return error ? [] : data ?? [];
+}
+
+export async function clearHistory() {
+  const { user } = await requireActiveAccount("/lich-su");
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return { error: "Database not configured" };
 
   const { error } = await supabase
-    .from('sr_watch_history')
-    .upsert({
-      profile_id: profileId,
-      movie_slug: historyData.movie_slug,
-      movie_title: historyData.movie_title,
-      poster_url: historyData.poster_url,
-      episode_slug: historyData.episode_slug,
-      episode_name: historyData.episode_name,
-      duration: historyData.duration,
-      playback_time: historyData.playback_time,
-      updated_at: new Date().toISOString()
-    }, {
-      onConflict: 'profile_id,movie_slug'
-    })
+    .from("sr_watch_history")
+    .delete()
+    .eq("user_id", user.id);
 
-  if (error) console.error('Failed to update watch history:', error)
-  
-  revalidatePath('/lich-su')
-}
+  if (error) return { error: "Không thể xóa lịch sử xem" };
 
-export async function getWatchHistory(profileId: string) {
-  if (!profileId) return []
-  const supabase = await createServerSupabaseClient()
-  if (!supabase) return []
-
-  const { data } = await supabase
-    .from('sr_watch_history')
-    .select('*')
-    .eq('profile_id', profileId)
-    .order('updated_at', { ascending: false })
-
-  return data || []
-}
-
-export async function clearHistory(profileId: string) {
-    if (!profileId) return { error: 'Vui lòng chọn Profile' }
-    const supabase = await createServerSupabaseClient()
-    if (!supabase) return { error: 'Database not configured' }
-  
-    const { error } = await supabase
-      .from('sr_watch_history')
-      .delete()
-      .eq('profile_id', profileId)
-  
-    if (error) return { error: error.message }
-    
-    revalidatePath('/lich-su')
-    return { success: true }
+  revalidatePath("/lich-su");
+  return { success: true };
 }

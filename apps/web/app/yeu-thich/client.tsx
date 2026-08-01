@@ -7,8 +7,9 @@ import MovieGrid from "@/components/movie/MovieGrid";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
-import { useProfileStore } from "@/lib/store/useProfileStore";
-import { clearAllFavorites, getFavorites } from "./actions";
+import { useAccountDataStore } from "@/lib/store/useAccountDataStore";
+import type { Movie } from "@/types/movie";
+import { clearAllFavorites } from "./actions";
 
 interface Favorite {
     movie_slug: string;
@@ -17,27 +18,18 @@ interface Favorite {
 }
 
 export default function FavoritesClient({ initialFavorites }: { initialFavorites: Favorite[] }) {
-    const { currentProfile, favoriteSlugs, setFavoriteSlugs } = useProfileStore();
+    const { favoriteSlugs, setFavoriteSlugs } = useAccountDataStore();
     const [favorites, setFavorites] = useState(initialFavorites);
     const [showConfirm, setShowConfirm] = useState(false);
     const [isPending, setIsPending] = useState(false);
 
     useEffect(() => {
-        if (currentProfile?.id) {
-            getFavorites(currentProfile.id).then((data) => {
-                setFavorites(data.map((favorite: any) => ({
-                    movie_slug: favorite.movie_slug,
-                    movie_title: favorite.movie_title,
-                    poster_url: favorite.poster_url,
-                })));
-            });
-        }
-    }, [currentProfile?.id]);
+        setFavoriteSlugs(initialFavorites.map((favorite) => favorite.movie_slug));
+    }, [initialFavorites, setFavoriteSlugs]);
 
     const handleClearAll = async () => {
-        if (!currentProfile?.id) return;
         setIsPending(true);
-        const result = await clearAllFavorites(currentProfile.id);
+        const result = await clearAllFavorites();
         if (result.success) {
             setFavorites([]);
             setFavoriteSlugs([]);
@@ -46,7 +38,7 @@ export default function FavoritesClient({ initialFavorites }: { initialFavorites
         setIsPending(false);
     };
 
-    const movies = favorites
+    const movies: Movie[] = favorites
         .filter((favorite) => favoriteSlugs.includes(favorite.movie_slug))
         .map((favorite) => ({
             _id: favorite.movie_slug,
@@ -54,7 +46,15 @@ export default function FavoritesClient({ initialFavorites }: { initialFavorites
             name: favorite.movie_title,
             thumb_url: favorite.poster_url,
             poster_url: favorite.poster_url,
+            origin_name: "",
             type: "single" as const,
+            sub_docquyen: false,
+            chipiuliui: false,
+            time: "",
+            episode_current: "",
+            quality: "",
+            lang: "",
+            year: 0,
             category: [],
             country: [],
         }));
@@ -81,13 +81,13 @@ export default function FavoritesClient({ initialFavorites }: { initialFavorites
             <div className="mb-8 flex items-start gap-3 rounded-[var(--radius-lg)] border border-border bg-background-secondary/70 p-4 text-xs leading-6 text-foreground-secondary md:text-sm">
                 <Info className="mt-0.5 h-5 w-5 flex-none text-primary" />
                 <div>
-                    <p className="font-semibold text-foreground">Đồng bộ theo profile</p>
-                    <p>Danh sách này được lưu riêng cho profile hiện tại và có thể đồng bộ giữa các thiết bị.</p>
+                    <p className="font-semibold text-foreground">Đồng bộ theo tài khoản</p>
+                    <p>Danh sách này được lưu riêng cho tài khoản đang đăng nhập và đồng bộ giữa các thiết bị.</p>
                 </div>
             </div>
 
             {favorites.length > 0 ? (
-                <MovieGrid movies={movies as any} showProgress={false} />
+                <MovieGrid movies={movies} showProgress={false} />
             ) : (
                 <EmptyState
                     icon={<Heart className="h-5 w-5" />}
@@ -105,7 +105,7 @@ export default function FavoritesClient({ initialFavorites }: { initialFavorites
             <ConfirmDialog
                 isOpen={showConfirm}
                 title="Xóa toàn bộ phim yêu thích?"
-                description={`Bạn sắp xóa ${favorites.length} phim khỏi thư viện của profile này. Hành động này không thể hoàn tác.`}
+                description={`Bạn sắp xóa ${favorites.length} phim khỏi thư viện của tài khoản này. Hành động này không thể hoàn tác.`}
                 confirmLabel="Xóa tất cả"
                 isPending={isPending}
                 onClose={() => setShowConfirm(false)}

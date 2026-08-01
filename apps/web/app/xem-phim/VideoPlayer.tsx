@@ -4,8 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useStore } from "@/lib/store/useStore";
-import { useProfileStore } from "@/lib/store/useProfileStore";
+import { useAccountDataStore } from "@/lib/store/useAccountDataStore";
 import dynamic from "next/dynamic";
 
 const PlyrPlayer = dynamic(() => import("@/components/movie/PlyrPlayer"), { ssr: false });
@@ -43,8 +42,7 @@ export default function VideoPlayer({
     const searchParams = useSearchParams();
     const initialTime = searchParams.get('t') ? Math.floor(Number(searchParams.get('t'))) : undefined;
     const playerRef = useRef<any>(null);
-    const { updateProgress, addToHistory } = useStore();
-    const { currentProfile, updateWatchProgress } = useProfileStore();
+    const updateWatchProgress = useAccountDataStore((state) => state.updateWatchProgress);
     const [isLoading, setIsLoading] = useState(false);
 
     // Start with pending states while we check availability
@@ -157,17 +155,6 @@ export default function VideoPlayer({
         verifySources();
     }, [embedUrl, m3u8Url, ncEmbed, ncM3u8, paEmbed, paM3u8, episode]);
 
-    // Add to history on mount
-    useEffect(() => {
-        addToHistory({
-            slug: movieSlug,
-            name: movieName,
-            thumb: movieThumb,
-            episode,
-            episodeName,
-        });
-    }, [movieSlug, movieName, movieThumb, episode, episodeName, addToHistory]);
-
     // Save progress every 10 seconds while playing
     useEffect(() => {
         const saveInterval = setInterval(async () => {
@@ -177,30 +164,27 @@ export default function VideoPlayer({
 
                 if (duration > 0 && currentTime > 0) {
                     updateWatchProgress(movieSlug, { episode, episodeName, currentTime, duration, updatedAt: Date.now() });
-                    updateProgress(movieSlug, episode, episodeName, currentTime, duration);
 
-                    if (currentProfile?.id) {
-                        try {
-                            const { updateWatchHistory } = await import('@/app/lich-su/actions');
-                            await updateWatchHistory(currentProfile.id, {
-                                movie_slug: movieSlug,
-                                movie_title: movieName,
-                                poster_url: movieThumb,
-                                episode_slug: episode,
-                                episode_name: episodeName,
-                                duration,
-                                playback_time: currentTime,
-                            });
-                        } catch (err) {
-                            console.error('Failed to sync history:', err);
-                        }
+                    try {
+                        const { updateWatchHistory } = await import('@/app/lich-su/actions');
+                        await updateWatchHistory({
+                            movie_slug: movieSlug,
+                            movie_title: movieName,
+                            poster_url: movieThumb,
+                            episode_slug: episode,
+                            episode_name: episodeName,
+                            duration,
+                            playback_time: currentTime,
+                        });
+                    } catch (err) {
+                        console.error('Failed to sync history:', err);
                     }
                 }
             }
         }, 10000);
 
         return () => clearInterval(saveInterval);
-    }, [movieSlug, movieName, episode, episodeName, updateProgress, currentProfile, movieThumb, updateWatchProgress]);
+    }, [movieSlug, movieName, episode, episodeName, movieThumb, updateWatchProgress]);
 
     const togglePlay = useCallback(() => {
         playerRef.current?.togglePlay();

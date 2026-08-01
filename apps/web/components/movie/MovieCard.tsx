@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { Clock, Heart, Play } from "lucide-react";
 import { getImageUrl } from "@/lib/api/ophim";
-import { useProfileStore } from "@/lib/store/useProfileStore";
+import { useAccountDataStore } from "@/lib/store/useAccountDataStore";
 import { toggleFavorite } from "@/app/yeu-thich/actions";
 import type { Movie } from "@/types/movie";
 
@@ -16,7 +16,7 @@ interface MovieCardProps {
 }
 
 export default function MovieCard({ movie, index = 0, showProgress = true }: MovieCardProps) {
-    const { currentProfile, favoriteSlugs, toggleFavoriteSlug, watchProgress } = useProfileStore();
+    const { favoriteSlugs, toggleFavoriteSlug, watchProgress } = useAccountDataStore();
     const shouldReduceMotion = useReducedMotion();
     const isLiked = favoriteSlugs.includes(movie.slug);
     const progress = showProgress ? watchProgress[movie.slug] : null;
@@ -29,14 +29,9 @@ export default function MovieCard({ movie, index = 0, showProgress = true }: Mov
         event.preventDefault();
         event.stopPropagation();
 
-        if (!currentProfile?.id) {
-            console.warn("Vui lòng chọn Profile để thực hiện tính năng này");
-            return;
-        }
-
         toggleFavoriteSlug(movie.slug);
 
-        const result = await toggleFavorite(currentProfile.id, {
+        const result = await toggleFavorite({
             movie_slug: movie.slug,
             movie_title: movie.name,
             poster_url: movie.thumb_url,

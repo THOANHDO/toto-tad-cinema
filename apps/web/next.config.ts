@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  async redirects() {
+    return [
+      { source: "/signup", destination: "/login", permanent: false },
+      { source: "/register", destination: "/login", permanent: false },
+    ];
+  },
   images: {
     unoptimized: true,
     remotePatterns: [

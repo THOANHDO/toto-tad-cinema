@@ -49,7 +49,7 @@ const getOptionName = (options: Option[], slug: string) =>
 
 export async function generateMetadata(): Promise<Metadata> {
     return {
-        title: "Tìm kiếm nâng cao | ToTo TAD Media",
+        title: "Tìm kiếm nâng cao",
         description: "Lọc và tìm kiếm phim theo tên, quốc gia, thể loại và danh sách.",
     };
 }

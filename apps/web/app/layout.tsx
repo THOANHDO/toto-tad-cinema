@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
+import ActiveAccountGuard from "@/components/auth/ActiveAccountGuard";
 import "./globals.css";
+
+// Account status must be evaluated for every request. Without this, a build
+// performed before Supabase env vars are present could cache protected HTML.
+export const dynamic = "force-dynamic";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,18 +17,33 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://toto-tad-cinema.vercel.app";
+const SITE_NAME = "ToTo TAD Cinema";
+const SITE_DESCRIPTION =
+  "Website xem phim riêng tư với phim lẻ, phim bộ và hoạt hình chất lượng cao.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
   title: {
-    default: "ToTo TAD Media – Xem phim trực tuyến",
-    template: "%s | ToTo TAD Media",
+    default: `${SITE_NAME} – Xem phim trực tuyến`,
+    template: `%s | ${SITE_NAME}`,
   },
-  description: "Website xem phim miễn phí với chất lượng cao. Phim lẻ, phim bộ, hoạt hình mới nhất.",
+  description: SITE_DESCRIPTION,
   keywords: ["xem phim", "phim online", "phim miễn phí", "phim hay", "phim bộ", "phim lẻ"],
-  authors: [{ name: "ToTo TAD Media" }],
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  alternates: { canonical: "/" },
+  manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
     locale: "vi_VN",
-    siteName: "ToTo TAD Media",
+    url: SITE_URL,
+    title: `${SITE_NAME} – Xem phim trực tuyến`,
+    description: SITE_DESCRIPTION,
+    siteName: SITE_NAME,
   },
   icons: {
     icon: [
@@ -34,8 +52,6 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
-
-import ProfileGuard from "@/components/auth/ProfileGuard";
 
 export default function RootLayout({
   children,
@@ -50,11 +66,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
-        <ProfileGuard>
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </ProfileGuard>
+        <ActiveAccountGuard>{children}</ActiveAccountGuard>
       </body>
     </html>
   );

@@ -1,13 +1,5 @@
-import ProfilesClient from './client'
-import { getProfiles } from './actions'
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: 'Ai đang xem? | ToTo TAD Media',
-  description: 'Chọn profile của bạn để tiếp tục',
-}
-
-export default async function ProfilesPage() {
-  const initialProfiles = await getProfiles()
-  
-  return <ProfilesClient initialProfiles={initialProfiles} />
+export default function ProfilesPage() {
+  redirect("/");
 }
