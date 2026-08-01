@@ -7,10 +7,20 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.99.2
+        version: 2.108.1
     devDependencies:
       '@opennextjs/cloudflare':
         specifier: ^1.19.1
-        version: 1.19.11(next@16.1.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(wrangler@3.114.17)
+        version: 1.19.11(next@16.1.6(@babel/core@7.29.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(wrangler@3.114.17)
+      dotenv:
+        specifier: ^16.6.1
+        version: 16.6.1
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       turbo:
         specifier: ^2.0.0
         version: 2.9.18
@@ -68,7 +78,7 @@ importers:
     devDependencies:
       '@opennextjs/cloudflare':
         specifier: ^1.19.1
-        version: 1.19.11(next@16.1.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(wrangler@3.114.17)
+        version: 1.19.11(next@16.1.6(@babel/core@7.29.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(wrangler@3.114.17)
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.0
@@ -6330,7 +6340,7 @@ snapshots:
 
   '@nolyfill/is-core-module@1.0.39': {}
 
-  '@opennextjs/aws@4.0.2(next@16.1.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3))':
+  '@opennextjs/aws@4.0.2(next@16.1.6(@babel/core@7.29.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))':
     dependencies:
       '@ast-grep/napi': 0.40.5
       '@aws-sdk/client-cloudfront': 3.984.0
@@ -6353,11 +6363,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@opennextjs/cloudflare@1.19.11(next@16.1.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(wrangler@3.114.17)':
+  '@opennextjs/cloudflare@1.19.11(next@16.1.6(@babel/core@7.29.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(wrangler@3.114.17)':
     dependencies:
       '@ast-grep/napi': 0.40.5
       '@dotenvx/dotenvx': 1.31.0
-      '@opennextjs/aws': 4.0.2(next@16.1.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3))
+      '@opennextjs/aws': 4.0.2(next@16.1.6(@babel/core@7.29.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))
       ci-info: 4.4.0
       cloudflare: 4.5.0
       comment-json: 4.6.2

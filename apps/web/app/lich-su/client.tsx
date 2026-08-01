@@ -9,8 +9,8 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
 import { getImageUrl } from "@/lib/api/ophim";
-import { useProfileStore } from "@/lib/store/useProfileStore";
-import { clearHistory, getWatchHistory } from "./actions";
+import { useAccountDataStore } from "@/lib/store/useAccountDataStore";
+import { clearHistory } from "./actions";
 
 interface HistoryItem {
     movie_slug: string;
@@ -24,35 +24,28 @@ interface HistoryItem {
 }
 
 export default function HistoryClient({ initialHistory }: { initialHistory: HistoryItem[] }) {
-    const { currentProfile, setWatchHistory, setWatchProgress } = useProfileStore();
+    const { setWatchHistory, setWatchProgress } = useAccountDataStore();
     const [history, setHistory] = useState(initialHistory);
     const [showConfirm, setShowConfirm] = useState(false);
     const [isPending, setIsPending] = useState(false);
 
     useEffect(() => {
-        if (currentProfile?.id) {
-            getWatchHistory(currentProfile.id).then((data) => {
-                setHistory(data as any);
-
-                const progress: Record<string, any> = {};
-                data?.forEach((item: any) => {
-                    progress[item.movie_slug] = {
-                        episode: item.episode_slug,
-                        episodeName: item.episode_name,
-                        currentTime: item.playback_time,
-                        duration: item.duration,
-                        updatedAt: new Date(item.updated_at).getTime(),
-                    };
-                });
-                setWatchProgress(progress);
-            });
-        }
-    }, [currentProfile?.id, setWatchProgress]);
+        setWatchHistory(initialHistory);
+        setWatchProgress(Object.fromEntries(initialHistory.map((item) => [
+            item.movie_slug,
+            {
+                episode: item.episode_slug,
+                episodeName: item.episode_name,
+                currentTime: item.playback_time,
+                duration: item.duration,
+                updatedAt: new Date(item.updated_at).getTime(),
+            },
+        ])));
+    }, [initialHistory, setWatchHistory, setWatchProgress]);
 
     const handleClearAll = async () => {
-        if (!currentProfile?.id) return;
         setIsPending(true);
-        const result = await clearHistory(currentProfile.id);
+        const result = await clearHistory();
         if (result.success) {
             setHistory([]);
             setWatchHistory([]);
@@ -97,8 +90,8 @@ export default function HistoryClient({ initialHistory }: { initialHistory: Hist
             <div className="mb-8 flex items-start gap-3 rounded-[var(--radius-lg)] border border-border bg-background-secondary/70 p-4 text-xs leading-6 text-foreground-secondary md:text-sm">
                 <Info className="mt-0.5 h-5 w-5 flex-none text-primary" />
                 <div>
-                    <p className="font-semibold text-foreground">Tiến độ theo profile</p>
-                    <p>Playback time và tập gần nhất được lưu riêng cho profile hiện tại.</p>
+                    <p className="font-semibold text-foreground">Tiến độ theo tài khoản</p>
+                    <p>Playback time và tập gần nhất được lưu riêng cho tài khoản đang đăng nhập.</p>
                 </div>
             </div>
 
@@ -201,7 +194,7 @@ export default function HistoryClient({ initialHistory }: { initialHistory: Hist
             <ConfirmDialog
                 isOpen={showConfirm}
                 title="Xóa toàn bộ lịch sử?"
-                description="Tất cả tiến độ xem của profile này sẽ bị xóa và không thể khôi phục."
+                description="Tất cả tiến độ xem của tài khoản này sẽ bị xóa và không thể khôi phục."
                 confirmLabel="Xóa lịch sử"
                 isPending={isPending}
                 onClose={() => setShowConfirm(false)}

@@ -1,115 +1,93 @@
-'use server'
+"use server";
 
-import { createServerSupabaseClient } from '@repo/database'
-import { revalidatePath } from 'next/cache'
+import { requireActiveAccount } from "@/lib/auth/server";
+import { createServerSupabaseClient } from "@repo/database/server";
+import { revalidatePath } from "next/cache";
+import { favoriteSchema, type FavoriteInput } from "./schema";
 
-import { favoriteSchema, type FavoriteInput } from './schema'
+export async function toggleFavorite(movieData: FavoriteInput) {
+  const { user } = await requireActiveAccount("/yeu-thich");
+  const validated = favoriteSchema.safeParse(movieData);
 
-export async function toggleFavorite(profileId: string, movieData: FavoriteInput) {
-  console.log('toggleFavorite called for profile:', profileId, 'movie:', movieData.movie_slug)
-  if (!profileId) return { error: 'Vui lòng chọn Profile' }
-
-  // Validate data
-  const validated = favoriteSchema.safeParse(movieData)
   if (!validated.success) {
-    return { error: 'Dữ liệu phim không hợp lệ' }
-  }
-  
-  const supabase = await createServerSupabaseClient()
-  if (!supabase) return { error: 'Database not configured' }
-
-  // Verify profile exists
-  const { data: profile } = await supabase
-    .from('sr_profiles')
-    .select('id')
-    .eq('id', profileId)
-    .maybeSingle()
-  
-  if (!profile) {
-    return { error: 'Profile không tồn tại hoặc đã bị xóa. Vui lòng chọn lại Profile.' }
+    return { error: "Dữ liệu phim không hợp lệ" };
   }
 
-  // Check if already in favorites
-  const { data: existing } = await supabase
-    .from('sr_favorites')
-    .select('id')
-    .eq('profile_id', profileId)
-    .eq('movie_slug', movieData.movie_slug)
-    .maybeSingle()
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return { error: "Database not configured" };
+
+  const { data: existing, error: readError } = await supabase
+    .from("sr_favorites")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("movie_slug", validated.data.movie_slug)
+    .maybeSingle();
+
+  if (readError) return { error: "Không thể cập nhật phim yêu thích" };
 
   if (existing) {
-    console.log('Existing favorite found, deleting:', existing.id)
-    // Remove
     const { error } = await supabase
-      .from('sr_favorites')
+      .from("sr_favorites")
       .delete()
-      .eq('id', existing.id)
-    
-    if (error) {
-      console.error('Delete error:', error)
-      return { error: error.message }
-    }
+      .eq("id", existing.id)
+      .eq("user_id", user.id);
+
+    if (error) return { error: "Không thể cập nhật phim yêu thích" };
   } else {
-    console.log('Inserting new favorite for:', profileId, movieData.movie_slug)
-    // Add
-    const { error } = await supabase
-      .from('sr_favorites')
-      .insert({
-        profile_id: profileId,
-        movie_slug: movieData.movie_slug,
-        movie_title: movieData.movie_title,
-        poster_url: movieData.poster_url
-      })
-    
-    if (error) {
-      console.error('Insert error:', error)
-      return { error: error.message }
-    }
+    const { error } = await supabase.from("sr_favorites").insert({
+      user_id: user.id,
+      movie_slug: validated.data.movie_slug,
+      movie_title: validated.data.movie_title,
+      poster_url: validated.data.poster_url,
+    });
+
+    if (error) return { error: "Không thể cập nhật phim yêu thích" };
   }
 
-  revalidatePath('/yeu-thich')
-  return { success: true }
+  revalidatePath("/yeu-thich");
+  return { success: true };
 }
 
-export async function clearAllFavorites(profileId: string) {
-  if (!profileId) return { error: 'Vui lòng chọn Profile' }
-  const supabase = await createServerSupabaseClient()
-  if (!supabase) return { error: 'Database not configured' }
+export async function clearAllFavorites() {
+  const { user } = await requireActiveAccount("/yeu-thich");
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return { error: "Database not configured" };
 
   const { error } = await supabase
-    .from('sr_favorites')
+    .from("sr_favorites")
     .delete()
-    .eq('profile_id', profileId)
+    .eq("user_id", user.id);
 
-  if (error) return { error: error.message }
-  
-  revalidatePath('/yeu-thich')
-  return { success: true }
+  if (error) return { error: "Không thể xóa danh sách yêu thích" };
+
+  revalidatePath("/yeu-thich");
+  return { success: true };
 }
 
-export async function getFavorites(profileId: string) {
-    if (!profileId) return []
-    const supabase = await createServerSupabaseClient()
-    if (!supabase) return []
+export async function getFavorites() {
+  const { user } = await requireActiveAccount("/yeu-thich");
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return [];
 
-    const { data } = await supabase
-        .from('sr_favorites')
-        .select('*')
-        .eq('profile_id', profileId)
-        .order('created_at', { ascending: false })
+  const { data, error } = await supabase
+    .from("sr_favorites")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
 
-    return data || []
+  return error ? [] : data ?? [];
 }
 
-export async function getFavoriteSlugs(profileId: string) {
-  if (!profileId) return []
-  const supabase = await createServerSupabaseClient()
-  if (!supabase) return []
+export async function getFavoriteSlugs() {
+  const { user } = await requireActiveAccount("/yeu-thich");
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return [];
 
-  const { data } = await supabase
-    .from('sr_favorites')
-    .select('movie_slug')
-    .eq('profile_id', profileId)
+  const { data, error } = await supabase
+    .from("sr_favorites")
+    .select("movie_slug")
+    .eq("user_id", user.id);
 
-  return data?.map((f: any) => f.movie_slug) || []
+  if (error) return [];
+  return data?.map((favorite: { movie_slug: string }) => favorite.movie_slug) ?? [];
 }

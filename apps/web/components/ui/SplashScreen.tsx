@@ -12,7 +12,7 @@ export default function SplashScreen() {
                 </div>
                 <div>
                     <p className="text-sm font-semibold text-foreground">Đang chuẩn bị nội dung</p>
-                    <p className="mt-1 text-xs text-foreground-muted">ToTo TAD Media</p>
+                    <p className="mt-1 text-xs text-foreground-muted">ToTo TAD Cinema</p>
                 </div>
             </div>
         </div>

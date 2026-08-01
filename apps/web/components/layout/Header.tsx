@@ -2,8 +2,10 @@
 
 import Sheet from "@/components/ui/Sheet";
 import HelpDialog from "@/components/ui/HelpDialog";
+import SignOutButton from "@/components/auth/SignOutButton";
 import { getCategories, getCountries } from "@/lib/api/ophim";
-import { useProfileStore } from "@/lib/store/useProfileStore";
+import type { UserAccount } from "@/lib/auth/server";
+import { useAccountDataStore } from "@/lib/store/useAccountDataStore";
 import { useStore } from "@/lib/store/useStore";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -24,7 +26,6 @@ import {
     Search,
     Ticket,
     Tv,
-    UserCircle,
     Users,
     Volume2,
 } from "lucide-react";
@@ -93,7 +94,7 @@ function BrandLockup({ priority = false }: { priority?: boolean }) {
                     <span className="text-[#fff3e6]">TAD</span>
                 </span>
                 <span className="mt-1 flex items-center gap-1 text-[8px] font-bold tracking-[0.3em] text-[#d7d0c7] md:text-[9px]">
-                    MEDIA
+                    CINEMA
                     <Clapperboard
                         aria-hidden="true"
                         className="h-2.5 w-2.5 flex-none text-[#e73343] md:h-3 md:w-3"
@@ -105,34 +106,30 @@ function BrandLockup({ priority = false }: { priority?: boolean }) {
     );
 }
 
-export default function Header() {
+export default function Header({ account }: { account: UserAccount | null }) {
     const router = useRouter();
     const pathname = usePathname();
 
     const [isScrolled, setIsScrolled] = useState(false);
     const [sheetOpen, setSheetOpen] = useState(false);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
-    const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+    const [accountMenuOpen, setAccountMenuOpen] = useState(false);
     const [helpOpen, setHelpOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [genres, setGenres] = useState<HeaderFilterOption[]>([]);
     const [countries, setCountries] = useState<HeaderFilterOption[]>([]);
     const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-    const profileMenuRef = useRef<HTMLDivElement>(null);
-
-    const isSupabaseEnabled = Boolean(
-        process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-
-    const currentProfile = useProfileStore((state) => state.currentProfile);
-    const favoriteSlugs = useProfileStore((state) => state.favoriteSlugs);
-    const watchHistory = useProfileStore((state) => state.watchHistory);
+    const accountMenuRef = useRef<HTMLDivElement>(null);
+    const favoriteSlugs = useAccountDataStore((state) => state.favoriteSlugs);
+    const watchHistory = useAccountDataStore((state) => state.watchHistory);
     const movieSource = useStore((state) => state.movieSource);
     const setMovieSource = useStore((state) => state.setMovieSource);
 
     const activeColor = sourceConfig[movieSource].hex;
     const activeHoverColor = sourceConfig[movieSource].hoverHex;
+    const accountName = account?.display_name?.trim() || account?.email || "Tài khoản";
+    const accountInitial = accountName.charAt(0).toLocaleUpperCase("vi-VN");
 
     useEffect(() => {
         const frameId = window.requestAnimationFrame(() => setMounted(true));
@@ -179,15 +176,15 @@ export default function Header() {
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
-            if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
-                setProfileMenuOpen(false);
+            if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
+                setAccountMenuOpen(false);
             }
         };
-        if (profileMenuOpen) {
+        if (accountMenuOpen) {
             document.addEventListener("mousedown", handleClickOutside);
         }
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [profileMenuOpen]);
+    }, [accountMenuOpen]);
 
     const handleSourceChange = (source: MovieSource) => {
         if (source === movieSource) return;
@@ -204,8 +201,6 @@ export default function Header() {
     const toggleSection = (section: string) => {
         setExpandedSection((prev) => (prev === section ? null : section));
     };
-
-    if (pathname === "/profiles") return null;
 
     const renderSourceOptions = (onSelect?: () => void) =>
         (Object.entries(sourceConfig) as [MovieSource, (typeof sourceConfig)[MovieSource]][]).map(
@@ -327,7 +322,7 @@ export default function Header() {
                             href="/"
                             prefetch={false}
                             className="group flex h-11 flex-shrink-0 items-center"
-                            aria-label="ToTo TAD Media"
+                            aria-label="ToTo TAD Cinema"
                         >
                             <motion.div
                                 whileHover={{ y: -1 }}
@@ -533,43 +528,47 @@ export default function Header() {
                                 </div>
                             </div>
 
-                            {/* Profile Dropdown — tablet + desktop */}
-                            {isSupabaseEnabled && currentProfile && (
-                                <div ref={profileMenuRef} className="relative hidden md:block">
+                            {/* Account dropdown — tablet + desktop */}
+                            {account && (
+                                <div ref={accountMenuRef} className="relative hidden md:block">
                                     <motion.button
                                         whileHover={{ y: -1 }}
                                         whileTap={{ scale: 0.98 }}
                                         type="button"
-                                        onClick={() => setProfileMenuOpen((v) => !v)}
+                                        onClick={() => setAccountMenuOpen((open) => !open)}
                                         className="flex min-h-10 items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1 pl-1 pr-2 transition-colors hover:border-white/20 hover:bg-white/10 md:min-h-11 lg:pr-3 xl:min-h-10"
-                                        aria-label="Menu profile"
-                                        aria-expanded={profileMenuOpen}
+                                        aria-label={`Menu tài khoản của ${accountName}`}
+                                        aria-expanded={accountMenuOpen}
                                     >
-                                        <div className="h-8 w-8 overflow-hidden rounded-full border border-white/20">
-                                            {currentProfile.avatar_url ? (
-                                                <img
-                                                    src={currentProfile.avatar_url}
-                                                    alt={currentProfile.full_name}
-                                                    className="h-full w-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="flex h-full w-full items-center justify-center bg-gray-800">
-                                                    <UserCircle className="h-5 w-5 text-gray-400" />
-                                                </div>
-                                            )}
+                                        <div
+                                            data-account-avatar="desktop"
+                                            className="m-0 grid size-8 aspect-square shrink-0 place-items-center overflow-hidden rounded-full p-0 text-center text-sm font-bold leading-none text-primary"
+                                        >
+                                            <div
+                                                data-account-avatar-circle="desktop"
+                                                className="m-0 grid size-full aspect-square shrink-0 place-items-center overflow-hidden rounded-full border border-white/20 bg-primary/20 p-0 leading-none [transform:none]"
+                                            >
+                                                <span
+                                                    data-account-avatar-initial="desktop"
+                                                    aria-hidden="true"
+                                                    className="m-0 block size-[1em] p-0 text-center leading-none [transform:none]"
+                                                >
+                                                    {accountInitial}
+                                                </span>
+                                            </div>
                                         </div>
                                         <span className="hidden max-w-[100px] truncate text-sm font-medium text-gray-300 lg:block">
-                                            {currentProfile.full_name}
+                                            {accountName}
                                         </span>
                                         <ChevronDown
                                             className={`hidden h-4 w-4 text-foreground-muted transition-transform lg:block ${
-                                                profileMenuOpen ? "rotate-180" : ""
+                                                accountMenuOpen ? "rotate-180" : ""
                                             }`}
                                         />
                                     </motion.button>
 
                                     <AnimatePresence>
-                                        {profileMenuOpen && (
+                                        {accountMenuOpen && (
                                             <motion.div
                                                 initial={{ opacity: 0, y: 8 }}
                                                 animate={{ opacity: 1, y: 0 }}
@@ -578,23 +577,17 @@ export default function Header() {
                                             >
                                                 <div className="border-b border-white/5 px-4 py-3">
                                                     <p className="truncate text-sm font-semibold text-white">
-                                                        {currentProfile.full_name}
+                                                        {accountName}
                                                     </p>
-                                                    <button
-                                                        onClick={() => {
-                                                            setProfileMenuOpen(false);
-                                                            router.push("/profiles");
-                                                        }}
-                                                        className="mt-0.5 text-xs text-primary hover:underline"
-                                                    >
-                                                        Đổi profile
-                                                    </button>
+                                                    <p className="mt-0.5 truncate text-xs text-foreground-muted">
+                                                        {account.email}
+                                                    </p>
                                                 </div>
                                                 <div className="p-1.5">
                                                     <Link
                                                         href="/yeu-thich"
                                                         prefetch={false}
-                                                        onClick={() => setProfileMenuOpen(false)}
+                                                        onClick={() => setAccountMenuOpen(false)}
                                                         className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-foreground-secondary transition-colors hover:bg-white/5 hover:text-white md:min-h-11 xl:min-h-0"
                                                     >
                                                         <Heart className="h-4 w-4" />
@@ -608,7 +601,7 @@ export default function Header() {
                                                     <Link
                                                         href="/lich-su"
                                                         prefetch={false}
-                                                        onClick={() => setProfileMenuOpen(false)}
+                                                        onClick={() => setAccountMenuOpen(false)}
                                                         className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-foreground-secondary transition-colors hover:bg-white/5 hover:text-white md:min-h-11 xl:min-h-0"
                                                     >
                                                         <History className="h-4 w-4" />
@@ -621,7 +614,7 @@ export default function Header() {
                                                     </Link>
                                                     <button
                                                         onClick={() => {
-                                                            setProfileMenuOpen(false);
+                                                            setAccountMenuOpen(false);
                                                             setHelpOpen(true);
                                                         }}
                                                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-foreground-secondary transition-colors hover:bg-white/5 hover:text-white md:min-h-11 xl:min-h-0"
@@ -629,6 +622,10 @@ export default function Header() {
                                                         <HelpCircle className="h-4 w-4" />
                                                         Hướng dẫn
                                                     </button>
+                                                    <SignOutButton
+                                                        onBeforeSignOut={() => setAccountMenuOpen(false)}
+                                                        className="mt-1 flex w-full items-center gap-3 border-t border-white/5 px-3 py-3 text-sm text-error transition-colors hover:bg-error/10 hover:text-[#ff8d8d] md:min-h-11 xl:min-h-0"
+                                                    />
                                                 </div>
                                             </motion.div>
                                         )}
@@ -661,7 +658,7 @@ export default function Header() {
                             prefetch={false}
                             onClick={closeSheet}
                             className="flex min-h-11 items-center"
-                            aria-label="ToTo TAD Media"
+                            aria-label="ToTo TAD Cinema"
                         >
                             <BrandLockup />
                         </Link>
@@ -682,36 +679,31 @@ export default function Header() {
                         </Link>
                     </div>
 
-                    {/* Profile — mobile only (tablet has it in header) */}
-                    {isSupabaseEnabled && currentProfile && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                closeSheet();
-                                router.push("/profiles");
-                            }}
-                            className="flex min-h-16 items-center gap-3 border-b border-white/5 p-4 transition-colors hover:bg-white/5 md:hidden"
-                        >
-                            <div className="h-10 w-10 overflow-hidden rounded-full border border-white/20">
-                                {currentProfile.avatar_url ? (
-                                    <img
-                                        src={currentProfile.avatar_url}
-                                        alt={currentProfile.full_name}
-                                        className="h-full w-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="flex h-full w-full items-center justify-center bg-gray-800">
-                                        <UserCircle className="h-5 w-5 text-gray-400" />
-                                    </div>
-                                )}
+                    {/* Auth account — mobile only (tablet has it in header) */}
+                    {account && (
+                        <div className="flex min-h-16 items-center gap-3 border-b border-white/5 p-4 md:hidden">
+                            <div
+                                data-account-avatar="mobile"
+                                className="m-0 grid size-10 aspect-square shrink-0 place-items-center overflow-hidden rounded-full p-0 text-center text-base font-bold leading-none text-primary"
+                            >
+                                <div
+                                    data-account-avatar-circle="mobile"
+                                    className="m-0 grid size-full aspect-square shrink-0 place-items-center overflow-hidden rounded-full border border-white/20 bg-primary/20 p-0 leading-none [transform:none]"
+                                >
+                                    <span
+                                        data-account-avatar-initial="mobile"
+                                        aria-hidden="true"
+                                        className="m-0 block size-[1em] p-0 text-center leading-none [transform:none]"
+                                    >
+                                        {accountInitial}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="text-left">
-                                <p className="text-sm font-semibold text-white">
-                                    {currentProfile.full_name}
-                                </p>
-                                <p className="text-xs text-foreground-muted">Đổi profile</p>
+                            <div className="min-w-0 text-left">
+                                <p className="truncate text-sm font-semibold text-white">{accountName}</p>
+                                <p className="truncate text-xs text-foreground-muted">{account.email}</p>
                             </div>
-                        </button>
+                        </div>
                     )}
 
                     {/* Source — mobile + tablet portrait */}
@@ -774,8 +766,8 @@ export default function Header() {
                         </AnimatePresence>
                     </div>
 
-                    {/* Favorites / History / Help — mobile only (tablet uses profile dropdown) */}
-                    {isSupabaseEnabled && (
+                    {/* Favorites / History / Help — mobile only (tablet uses account dropdown) */}
+                    {account && (
                         <div className="mt-4 space-y-0.5 border-t border-white/5 px-2 pt-4 md:hidden">
                             <Link
                                 href="/yeu-thich"
@@ -815,6 +807,10 @@ export default function Header() {
                                 <HelpCircle className="h-5 w-5" />
                                 Hướng dẫn
                             </button>
+                            <SignOutButton
+                                onBeforeSignOut={closeSheet}
+                                className={`${sheetLinkClass} w-full text-error hover:bg-error/10 hover:text-[#ff8d8d]`}
+                            />
                         </div>
                     )}
                 </div>
