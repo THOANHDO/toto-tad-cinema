@@ -77,82 +77,33 @@ export default function VideoPlayer({
     const paEmbed = phimApiEpisode?.link_embed;
     const paM3u8 = phimApiEpisode?.link_m3u8;
 
-    // Check link availability and auto-select best source
+    // Select highest priority available source directly without HEAD preflight requests
     useEffect(() => {
-        setIsCheckingSources(true);
-        // Reset state for new episode
-        setAvailability({});
-        setActiveSource(null);
-        setCurrentM3u8Url(null);
-        setCurrentEmbedUrl(null);
+        setIsCheckingSources(false);
+        const sources = [
+            { key: "op-m3u8", url: m3u8Url, type: "m3u8" },
+            { key: "nc-m3u8", url: ncM3u8, type: "m3u8" },
+            { key: "pa-m3u8", url: paM3u8, type: "m3u8" },
+            { key: "op-embed", url: embedUrl, type: "embed" },
+            { key: "nc-embed", url: ncEmbed, type: "embed" },
+            { key: "pa-embed", url: paEmbed, type: "embed" },
+        ];
 
-        const checkLink = async (url: string, key: string): Promise<boolean> => {
-            if (!url) return false;
-            try {
-                // If it's a m3u8 link from kkphimplayer, it might have restrictive CORS
-                await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-                return true;
-            } catch {
-                return false;
-            }
-        };
-
-        const verifySources = async () => {
-            // Check all sources in parallel to be fast, but we'll prioritize the results
-            const checks = [
-                { key: 'op-m3u8', url: m3u8Url, type: 'm3u8' },
-                { key: 'nc-m3u8', url: ncM3u8, type: 'm3u8' },
-                { key: 'pa-m3u8', url: paM3u8, type: 'm3u8' },
-                { key: 'op-embed', url: embedUrl, type: 'embed' },
-                { key: 'nc-embed', url: ncEmbed, type: 'embed' },
-                { key: 'pa-embed', url: paEmbed, type: 'embed' }
-            ];
-
-            const results: Record<string, boolean> = {};
-            
-            await Promise.all(checks.map(async (check) => {
-                const isAvailable = await checkLink(check.url, check.key);
-                results[check.key] = isAvailable;
-            }));
-
-            setAvailability(results);
-            
-            // Auto-select the highest priority available source
-            // Priority: OP-M3U8 > NC-M3U8 > PA-M3U8 > OP-EMBED > NC-EMBED > PA-EMBED
-            let selected = null;
-            for (const check of checks) {
-                if (results[check.key] && check.url) {
-                    selected = check;
-                    break;
-                }
-            }
-
-            if (selected) {
-                setActiveSource(selected.key as any);
-                if (selected.type === 'm3u8') {
-                    setCurrentM3u8Url(selected.url);
-                    setUseEmbed(false);
-                } else {
-                    setCurrentEmbedUrl(selected.url);
-                    setUseEmbed(true);
-                }
+        const selected = sources.find((s) => Boolean(s.url));
+        if (selected) {
+            setActiveSource(selected.key as any);
+            if (selected.type === "m3u8") {
+                setCurrentM3u8Url(selected.url);
+                setUseEmbed(false);
             } else {
-                // Fallback completely if all checks fail but we have URLs (could be cors issues hiding real status)
-                if (m3u8Url) {
-                    setActiveSource("op-m3u8");
-                    setCurrentM3u8Url(m3u8Url);
-                    setUseEmbed(false);
-                } else if (embedUrl) {
-                    setActiveSource("op-embed");
-                    setCurrentEmbedUrl(embedUrl);
-                    setUseEmbed(true);
-                }
+                setCurrentEmbedUrl(selected.url);
+                setUseEmbed(true);
             }
-
-            setIsCheckingSources(false);
-        };
-
-        verifySources();
+        } else {
+            setActiveSource(null);
+            setCurrentM3u8Url(null);
+            setCurrentEmbedUrl(null);
+        }
     }, [embedUrl, m3u8Url, ncEmbed, ncM3u8, paEmbed, paM3u8, episode]);
 
     // Save progress every 10 seconds while playing

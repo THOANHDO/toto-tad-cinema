@@ -48,4 +48,4 @@ export async function searchMovies(q: string, page: number = 1) {
 
 // Delegate these specifically to ophim or nguonC as needed.
 // These are mostly used for details which are source-dependent already via the slugs.
-export { getMovieDetail, getImageUrl, getMoviePeoples, getMovieDetailNguonC, getMovieDetailPhimApi, getCategories, getCountries, movieTypes } from "./ophim";
+export { getMovieDetail, resolveOPhimImageUrl, getImageUrl, getMoviePeoples, getMovieDetailNguonC, getMovieDetailPhimApi, getCategories, getCountries, movieTypes } from "./ophim";

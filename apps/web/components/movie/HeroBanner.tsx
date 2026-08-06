@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { Info, Play } from "lucide-react";
-import { getImageUrl } from "@/lib/api/ophim";
+import { useState } from "react";
+import { resolveOPhimImageUrl } from "@/lib/api/ophim";
 import type { Movie } from "@/types/movie";
 
 interface HeroBannerProps {
@@ -13,6 +14,7 @@ interface HeroBannerProps {
 
 export default function HeroBanner({ movie }: HeroBannerProps) {
     const shouldReduceMotion = useReducedMotion();
+    const [imgSrc, setImgSrc] = useState(() => resolveOPhimImageUrl(movie.poster_url || movie.thumb_url));
 
     return (
         <section
@@ -21,11 +23,12 @@ export default function HeroBanner({ movie }: HeroBannerProps) {
         >
             <div className="absolute inset-0">
                 <Image
-                    src={getImageUrl(movie.poster_url || movie.thumb_url)}
+                    src={imgSrc}
                     alt=""
                     fill
                     priority
                     sizes="100vw"
+                    onError={() => setImgSrc("/placeholder.jpg")}
                     className="object-cover object-[62%_center] sm:object-center md:object-[60%_center] lg:object-center"
                 />
                 <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,4,6,0.96)_0%,rgba(3,4,6,0.78)_32%,rgba(3,4,6,0.26)_68%,rgba(3,4,6,0.2)_100%)]" />

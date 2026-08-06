@@ -1,7 +1,9 @@
 "use client";
 
 import { clearUserScopedState } from "@/lib/auth/client-state";
+import { mapSupabaseAuthError } from "@/lib/auth/error-mapping";
 import { getSafeNextPath } from "@/lib/auth/redirect";
+import { validateSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@repo/database/client";
 import { Eye, EyeOff, Loader2, LockKeyhole, Mail } from "lucide-react";
 import Image from "next/image";
@@ -14,7 +16,20 @@ interface LoginFormProps {
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const INVALID_CREDENTIALS_MESSAGE = "Email hoặc mật khẩu không chính xác.";
+
+function maskEmail(email: string): string {
+  if (!email || !email.includes("@")) return "***";
+  const [local, domain] = email.split("@");
+  if (local.length <= 2) return `${local.charAt(0)}***@${domain}`;
+  return `${local.charAt(0)}***${local.charAt(local.length - 1)}@${domain}`;
+}
+
+function logAuthDev(stage: string, details?: Record<string, any>) {
+  if (process.env.NODE_ENV !== "production") {
+    const info = details ? JSON.stringify(details) : "";
+    console.log(`[auth:${stage}] ${info}`);
+  }
+}
 
 export default function LoginForm({ nextPath, initialError }: LoginFormProps) {
   const router = useRouter();
@@ -34,14 +49,26 @@ export default function LoginForm({ nextPath, initialError }: LoginFormProps) {
     event.preventDefault();
     if (submittingRef.current) return;
 
+    logAuthDev("submit", { email: maskEmail(email) });
+
+    // Step 1: Validate environment variables
+    const envStatus = validateSupabaseEnv();
+    if (!envStatus.configured) {
+      logAuthDev("config", { missing: envStatus.missingKeys, invalid: envStatus.invalidKeys });
+      setErrorMessage("Dịch vụ đăng nhập chưa được cấu hình. Vui lòng liên hệ quản trị viên.");
+      return;
+    }
+
+    // Step 2: Validate input format
     const normalizedEmail = email.trim().toLowerCase();
     if (!EMAIL_PATTERN.test(normalizedEmail) || password.length === 0) {
-      setErrorMessage(INVALID_CREDENTIALS_MESSAGE);
+      setErrorMessage("Email hoặc mật khẩu không chính xác.");
       return;
     }
 
     const supabase = createClient();
     if (!supabase) {
+      logAuthDev("config", { client: "null" });
       setErrorMessage("Dịch vụ đăng nhập chưa được cấu hình. Vui lòng liên hệ quản trị viên.");
       return;
     }
@@ -51,16 +78,21 @@ export default function LoginForm({ nextPath, initialError }: LoginFormProps) {
     setErrorMessage(null);
 
     try {
+      // Step 3: Attempt sign in
       const { data, error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password,
       });
 
       if (error || !data.user) {
-        setErrorMessage(INVALID_CREDENTIALS_MESSAGE);
+        logAuthDev("response", { status: "error", errorCategory: error?.code || error?.message });
+        setErrorMessage(mapSupabaseAuthError(error));
         return;
       }
 
+      logAuthDev("session", { userId: data.user.id });
+
+      // Step 4: Verify user_accounts profile
       const { data: account, error: accountError } = await supabase
         .from("user_accounts")
         .select("user_id,is_active")
@@ -68,6 +100,7 @@ export default function LoginForm({ nextPath, initialError }: LoginFormProps) {
         .maybeSingle();
 
       if (accountError || !account) {
+        logAuthDev("profile", { status: "missing_profile", userId: data.user.id });
         await supabase.auth.signOut();
         clearUserScopedState();
         setErrorMessage("Tài khoản này chưa được cấp quyền truy cập.");
@@ -75,17 +108,25 @@ export default function LoginForm({ nextPath, initialError }: LoginFormProps) {
       }
 
       if (!account.is_active) {
+        logAuthDev("profile", { status: "inactive_account", userId: data.user.id });
         await supabase.auth.signOut();
         clearUserScopedState();
         setErrorMessage("Tài khoản này đã bị vô hiệu hóa");
         return;
       }
 
+      logAuthDev("profile", { status: "active", userId: data.user.id });
+
+      // Step 5: Success & Redirect
+      const targetPath = getSafeNextPath(nextPath) ?? "/";
+      logAuthDev("redirect", { targetPath });
+
       clearUserScopedState();
-      router.replace(getSafeNextPath(nextPath) ?? "/");
+      router.replace(targetPath);
       router.refresh();
-    } catch {
-      setErrorMessage(INVALID_CREDENTIALS_MESSAGE);
+    } catch (err: unknown) {
+      logAuthDev("response", { status: "exception" });
+      setErrorMessage(mapSupabaseAuthError(err));
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);

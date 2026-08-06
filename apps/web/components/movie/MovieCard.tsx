@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { Clock, Heart, Play } from "lucide-react";
-import { getImageUrl } from "@/lib/api/ophim";
+import { useState } from "react";
+import { resolveOPhimImageUrl } from "@/lib/api/ophim";
 import { useAccountDataStore } from "@/lib/store/useAccountDataStore";
 import { toggleFavorite } from "@/app/yeu-thich/actions";
 import type { Movie } from "@/types/movie";
@@ -20,6 +21,7 @@ export default function MovieCard({ movie, index = 0, showProgress = true }: Mov
     const shouldReduceMotion = useReducedMotion();
     const isLiked = favoriteSlugs.includes(movie.slug);
     const progress = showProgress ? watchProgress[movie.slug] : null;
+    const [imgSrc, setImgSrc] = useState(() => resolveOPhimImageUrl(movie.thumb_url || movie.poster_url));
 
     const progressPercent = progress
         ? Math.round((progress.currentTime / progress.duration) * 100)
@@ -59,10 +61,11 @@ export default function MovieCard({ movie, index = 0, showProgress = true }: Mov
                 >
                     <div className="relative aspect-[2/3] overflow-hidden">
                         <Image
-                            src={getImageUrl(movie.thumb_url)}
+                            src={imgSrc}
                             alt={movie.name}
                             fill
                             sizes="(max-width: 480px) 46vw, (max-width: 767px) 31vw, (max-width: 1023px) 30vw, (max-width: 1279px) 22vw, 16vw"
+                            onError={() => setImgSrc("/placeholder.jpg")}
                             className="object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.035]"
                         />
 
