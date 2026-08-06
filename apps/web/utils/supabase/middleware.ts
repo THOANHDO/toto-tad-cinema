@@ -1,8 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSafeNextPath } from "@/lib/auth/redirect";
 
-const PUBLIC_ROUTES = new Set(["/login", "/auth/callback", "/auth/confirm", "/auth/signout"]);
+const PUBLIC_ROUTES = new Set([
+  "/login",
+  "/auth/callback",
+  "/auth/confirm",
+  "/auth/signout",
+  "/manifest.webmanifest",
+  "/manifest.json",
+]);
 
 const hasSupabaseConfig = () =>
   Boolean(
@@ -19,14 +27,16 @@ const copyResponseCookies = (source: NextResponse, target: NextResponse) => {
   return target;
 };
 
+
 const redirectToLogin = (request: NextRequest, response: NextResponse) => {
   const loginUrl = request.nextUrl.clone();
   loginUrl.pathname = "/login";
   loginUrl.search = "";
-  loginUrl.searchParams.set(
-    "next",
-    `${request.nextUrl.pathname}${request.nextUrl.search}`,
-  );
+
+  const safeNext = getSafeNextPath(`${request.nextUrl.pathname}${request.nextUrl.search}`);
+  if (safeNext && safeNext !== "/") {
+    loginUrl.searchParams.set("next", safeNext);
+  }
 
   return copyResponseCookies(response, NextResponse.redirect(loginUrl));
 };

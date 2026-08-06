@@ -106,6 +106,8 @@ function BrandLockup({ priority = false }: { priority?: boolean }) {
     );
 }
 
+let headerCache: { genres: HeaderFilterOption[]; countries: HeaderFilterOption[]; timestamp: number } | null = null;
+
 export default function Header({ account }: { account: UserAccount | null }) {
     const router = useRouter();
     const pathname = usePathname();
@@ -134,10 +136,21 @@ export default function Header({ account }: { account: UserAccount | null }) {
     useEffect(() => {
         const frameId = window.requestAnimationFrame(() => setMounted(true));
         const fetchData = async () => {
+            if (headerCache && Date.now() - headerCache.timestamp < 1800000) {
+                setGenres(headerCache.genres);
+                setCountries(headerCache.countries);
+                return;
+            }
             try {
-                const [gData, cData] = await Promise.all([getCategories(), getCountries()]);
-                setGenres(gData?.data?.items || []);
-                setCountries(cData?.data?.items || []);
+                const [gRes, cRes] = await Promise.allSettled([getCategories(), getCountries()]);
+                const loadedGenres = (gRes.status === "fulfilled" && gRes.value?.data?.items) ? gRes.value.data.items : [];
+                const loadedCountries = (cRes.status === "fulfilled" && cRes.value?.data?.items) ? cRes.value.data.items : [];
+
+                setGenres(loadedGenres);
+                setCountries(loadedCountries);
+                if (loadedGenres.length > 0 || loadedCountries.length > 0) {
+                    headerCache = { genres: loadedGenres, countries: loadedCountries, timestamp: Date.now() };
+                }
             } catch (error) {
                 console.error("Failed to fetch header data:", error);
             }

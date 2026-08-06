@@ -64,13 +64,13 @@ export default async function AdvancedSearchPage({ searchParams }: Props) {
     const page = readPositiveInteger(params.page, 1);
     const limit = readPositiveInteger(params.limit, 24);
 
-    const [genresData, countriesData] = await Promise.all([
+    const [genresRes, countriesRes] = await Promise.allSettled([
         getCategories(),
         getCountries(),
     ]);
 
-    const genres: Option[] = genresData?.data?.items || [];
-    const countries: Option[] = countriesData?.data?.items || [];
+    const genres: Option[] = (genresRes.status === "fulfilled" && genresRes.value?.data?.items) ? genresRes.value.data.items : [];
+    const countries: Option[] = (countriesRes.status === "fulfilled" && countriesRes.value?.data?.items) ? countriesRes.value.data.items : [];
     const types: Option[] = movieTypes.map(({ name, slug }) => ({ name, slug }));
 
     const hasFacetFilters = Boolean(category || country || type || year);
