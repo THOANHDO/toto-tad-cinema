@@ -28,7 +28,11 @@ export default function HeroBanner({ movie }: HeroBannerProps) {
                     fill
                     priority
                     sizes="100vw"
-                    onError={() => setImgSrc("/placeholder.jpg")}
+                    onError={() => {
+                        if (imgSrc !== "/placeholder.jpg") {
+                            setImgSrc("/placeholder.jpg");
+                        }
+                    }}
                     className="object-cover object-[62%_center] sm:object-center md:object-[60%_center] lg:object-center"
                 />
                 <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,4,6,0.96)_0%,rgba(3,4,6,0.78)_32%,rgba(3,4,6,0.26)_68%,rgba(3,4,6,0.2)_100%)]" />

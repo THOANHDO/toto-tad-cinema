@@ -64,8 +64,13 @@ export default function MovieCard({ movie, index = 0, showProgress = true }: Mov
                             src={imgSrc}
                             alt={movie.name}
                             fill
+                            loading="lazy"
                             sizes="(max-width: 480px) 46vw, (max-width: 767px) 31vw, (max-width: 1023px) 30vw, (max-width: 1279px) 22vw, 16vw"
-                            onError={() => setImgSrc("/placeholder.jpg")}
+                            onError={() => {
+                                if (imgSrc !== "/placeholder.jpg") {
+                                    setImgSrc("/placeholder.jpg");
+                                }
+                            }}
                             className="object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.035]"
                         />
 

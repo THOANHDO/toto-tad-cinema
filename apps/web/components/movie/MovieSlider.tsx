@@ -28,6 +28,8 @@ export default function MovieSlider({ title, movies, href, showProgress = true }
 
     if (!movies || movies.length === 0) return null;
 
+    const showNavButtons = movies.length > 5;
+
     return (
         <section className="group/section relative py-7 md:py-8 lg:py-9" aria-labelledby={`section-${href ?? title}`}>
             <div className="mb-4 flex items-end justify-between gap-4 md:mb-5">
@@ -50,23 +52,27 @@ export default function MovieSlider({ title, movies, href, showProgress = true }
             </div>
 
             <div className="relative">
-                <button
-                    type="button"
-                    onClick={() => scroll("left")}
-                    className="absolute left-2 top-[42%] z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/75 text-white opacity-0 shadow-xl backdrop-blur-md transition-[opacity,background-color,border-color] hover:border-white/20 hover:bg-black/90 group-hover/section:opacity-100 group-focus-within/section:opacity-100 xl:flex"
-                    aria-label={`Cuộn ${title} sang trái`}
-                >
-                    <ChevronLeft className="h-5 w-5" />
-                </button>
+                {showNavButtons && (
+                    <button
+                        type="button"
+                        onClick={() => scroll("left")}
+                        className="absolute left-2 top-[42%] z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/75 text-white opacity-0 shadow-xl backdrop-blur-md transition-[opacity,background-color,border-color] hover:border-white/20 hover:bg-black/90 group-hover/section:opacity-100 group-focus-within/section:opacity-100 xl:flex"
+                        aria-label={`Cuộn ${title} sang trái`}
+                    >
+                        <ChevronLeft className="h-5 w-5" />
+                    </button>
+                )}
 
-                <button
-                    type="button"
-                    onClick={() => scroll("right")}
-                    className="absolute right-2 top-[42%] z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/75 text-white opacity-0 shadow-xl backdrop-blur-md transition-[opacity,background-color,border-color] hover:border-white/20 hover:bg-black/90 group-hover/section:opacity-100 group-focus-within/section:opacity-100 xl:flex"
-                    aria-label={`Cuộn ${title} sang phải`}
-                >
-                    <ChevronRight className="h-5 w-5" />
-                </button>
+                {showNavButtons && (
+                    <button
+                        type="button"
+                        onClick={() => scroll("right")}
+                        className="absolute right-2 top-[42%] z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-black/75 text-white opacity-0 shadow-xl backdrop-blur-md transition-[opacity,background-color,border-color] hover:border-white/20 hover:bg-black/90 group-hover/section:opacity-100 group-focus-within/section:opacity-100 xl:flex"
+                        aria-label={`Cuộn ${title} sang phải`}
+                    >
+                        <ChevronRight className="h-5 w-5" />
+                    </button>
+                )}
 
                 <div
                     ref={sliderRef}
