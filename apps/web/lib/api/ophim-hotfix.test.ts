@@ -68,8 +68,8 @@ describe("Unsupported OPhim Slugs Protection", () => {
 
   test("getMoviesByType returns empty result for unsupported slugs without throwing", async () => {
     const res = await getMoviesByType("phim-bo-dang-chieu", 1);
-    assert.deepStrictEqual(res, {
-      data: { items: [], params: { pagination: { totalItems: 0 } } },
-    });
+    assert.equal(res.items.length, 0);
+    assert.equal(res.data.items.length, 0);
+    assert.equal(res.pagination.totalItems, 0);
   });
 });
