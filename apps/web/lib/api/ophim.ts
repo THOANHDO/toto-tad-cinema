@@ -213,6 +213,61 @@ export async function safeFetchOPhim(
   }
 }
 
+/**
+ * Safely extracts pagination metadata from various API response shapes.
+ */
+export interface MoviePagination {
+  totalItems: number;
+  totalItemsPerPage: number;
+  currentPage: number;
+  totalPages: number;
+}
+
+export function extractMoviePagination(payload: any, fallbackItemsLength: number = 0): MoviePagination {
+  if (!payload || typeof payload !== "object") {
+    return {
+      totalItems: fallbackItemsLength,
+      totalItemsPerPage: 24,
+      currentPage: 1,
+      totalPages: fallbackItemsLength > 0 ? Math.ceil(fallbackItemsLength / 24) : 1,
+    };
+  }
+
+  const rawPag =
+    payload?.data?.params?.pagination ||
+    payload?.data?.pagination ||
+    payload?.pagination ||
+    payload?.params?.pagination ||
+    null;
+
+  if (rawPag && typeof rawPag === "object") {
+    const totalItems = Number(rawPag.totalItems) || fallbackItemsLength;
+    const totalItemsPerPage = Number(rawPag.totalItemsPerPage) || Number(rawPag.pageRanges) || 24;
+    const currentPage = Number(rawPag.currentPage) || 1;
+    const rawTotalPages = Number(rawPag.totalPages);
+    const totalPages =
+      Number.isFinite(rawTotalPages) && rawTotalPages > 0
+        ? rawTotalPages
+        : totalItems > 0
+        ? Math.ceil(totalItems / totalItemsPerPage)
+        : 1;
+
+    return {
+      totalItems,
+      totalItemsPerPage,
+      currentPage,
+      totalPages,
+    };
+  }
+
+  return {
+    totalItems: fallbackItemsLength,
+    totalItemsPerPage: 24,
+    currentPage: 1,
+    totalPages: fallbackItemsLength > 0 ? Math.ceil(fallbackItemsLength / 24) : 1,
+  };
+}
+
 // Fetch newly updated movies (TTL: 3 mins)
 export async function getNewlyUpdatedMovies(page: number = 1) {
   const data = await safeFetchOPhim(`danh-sach/phim-moi-cap-nhat?page=${page}`, {
@@ -220,13 +275,32 @@ export async function getNewlyUpdatedMovies(page: number = 1) {
     ttlSeconds: 180,
   });
   const items = extractMovieItems(data);
-  return { items, data: { items } };
+  const pagination = extractMoviePagination(data, items.length);
+
+  return {
+    ...(data || {}),
+    items,
+    pagination,
+    data: {
+      ...(data?.data || {}),
+      items,
+      params: {
+        ...(data?.data?.params || {}),
+        pagination,
+      },
+    },
+  };
 }
 
 // Fetch movies by type (phim-le, phim-bo, hoat-hinh, tv-shows, etc.) (TTL: 10 mins)
 export async function getMoviesByType(type: string, page: number = 1, limit: number = 24) {
   if (UNSUPPORTED_OPHIM_SLUGS.has(type)) {
-    return { data: { items: [], params: { pagination: { totalItems: 0 } } } };
+    const emptyPag = { totalItems: 0, totalItemsPerPage: limit, currentPage: page, totalPages: 1 };
+    return {
+      items: [],
+      pagination: emptyPag,
+      data: { items: [], params: { pagination: emptyPag } },
+    };
   }
 
   const data = await safeFetchOPhim(`v1/api/danh-sach/${type}?page=${page}&limit=${limit}`, {
@@ -234,7 +308,21 @@ export async function getMoviesByType(type: string, page: number = 1, limit: num
     ttlSeconds: 600,
   });
   const items = extractMovieItems(data);
-  return { data: { items, params: { pagination: { totalItems: items.length } } } };
+  const pagination = extractMoviePagination(data, items.length);
+
+  return {
+    ...(data || {}),
+    items,
+    pagination,
+    data: {
+      ...(data?.data || {}),
+      items,
+      params: {
+        ...(data?.data?.params || {}),
+        pagination,
+      },
+    },
+  };
 }
 
 // Fetch movies by genre (TTL: 10 mins)
@@ -243,11 +331,22 @@ export async function getMoviesByGenre(genreSlug: string, page: number = 1) {
     revalidate: 600,
     ttlSeconds: 600,
   });
-  if (!data) return { data: { items: [] } };
-  if (data.data?.items) {
-    data.data.items = filterNSFW(data.data.items);
-  }
-  return data;
+  const items = extractMovieItems(data);
+  const pagination = extractMoviePagination(data, items.length);
+
+  return {
+    ...(data || {}),
+    items,
+    pagination,
+    data: {
+      ...(data?.data || {}),
+      items,
+      params: {
+        ...(data?.data?.params || {}),
+        pagination,
+      },
+    },
+  };
 }
 
 // Fetch movies by country (TTL: 10 mins)
@@ -256,11 +355,22 @@ export async function getMoviesByCountry(countrySlug: string, page: number = 1) 
     revalidate: 600,
     ttlSeconds: 600,
   });
-  if (!data) return { data: { items: [] } };
-  if (data.data?.items) {
-    data.data.items = filterNSFW(data.data.items);
-  }
-  return data;
+  const items = extractMovieItems(data);
+  const pagination = extractMoviePagination(data, items.length);
+
+  return {
+    ...(data || {}),
+    items,
+    pagination,
+    data: {
+      ...(data?.data || {}),
+      items,
+      params: {
+        ...(data?.data?.params || {}),
+        pagination,
+      },
+    },
+  };
 }
 
 // Search movies (TTL: 60 seconds)
@@ -269,11 +379,22 @@ export async function searchMovies(keyword: string, page: number = 1) {
     `v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&page=${page}`,
     { revalidate: 60, ttlSeconds: 60 }
   );
-  if (!data) return { data: { items: [] } };
-  if (data.data?.items) {
-    data.data.items = filterNSFW(data.data.items);
-  }
-  return data;
+  const items = extractMovieItems(data);
+  const pagination = extractMoviePagination(data, items.length);
+
+  return {
+    ...(data || {}),
+    items,
+    pagination,
+    data: {
+      ...(data?.data || {}),
+      items,
+      params: {
+        ...(data?.data?.params || {}),
+        pagination,
+      },
+    },
+  };
 }
 
 // Advanced Search / Filter movies

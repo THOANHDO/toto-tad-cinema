@@ -9,6 +9,7 @@ import {
   safeFetchOPhim,
   resolveOPhimImageUrl,
   extractMovieItems,
+  extractMoviePagination,
 } from "./ophim";
 
 describe("Home Data Loader & Resilience", () => {
@@ -182,5 +183,57 @@ describe("extractMovieItems Payload Normalizer & Deduplication", () => {
     assert.deepEqual(extractMovieItems(null), []);
     assert.deepEqual(extractMovieItems({}), []);
     assert.deepEqual(extractMovieItems({ data: { items: [] } }), []);
+  });
+});
+
+describe("extractMoviePagination Metadata Normalizer", () => {
+  test("extracts real upstream pagination from data.params.pagination", () => {
+    const payload = {
+      data: {
+        params: {
+          pagination: {
+            totalItems: 18652,
+            totalItemsPerPage: 24,
+            currentPage: 1,
+            totalPages: 778,
+          },
+        },
+      },
+    };
+    const pag = extractMoviePagination(payload);
+    assert.equal(pag.totalItems, 18652);
+    assert.equal(pag.totalPages, 778);
+    assert.equal(pag.currentPage, 1);
+  });
+
+  test("extracts pagination from root pagination property", () => {
+    const payload = {
+      pagination: {
+        totalItems: 4218,
+        totalItemsPerPage: 24,
+        currentPage: 2,
+        totalPages: 176,
+      },
+    };
+    const pag = extractMoviePagination(payload);
+    assert.equal(pag.totalItems, 4218);
+    assert.equal(pag.totalPages, 176);
+    assert.equal(pag.currentPage, 2);
+  });
+
+  test("calculates fallback totalPages when rawTotalPages is missing", () => {
+    const payload = {
+      data: {
+        params: {
+          pagination: {
+            totalItems: 500,
+            totalItemsPerPage: 20,
+          },
+        },
+      },
+    };
+    const pag = extractMoviePagination(payload);
+    assert.equal(pag.totalItems, 500);
+    assert.equal(pag.totalPages, 25);
   });
 });
