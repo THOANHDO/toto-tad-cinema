@@ -7,6 +7,7 @@ export const UNSUPPORTED_OPHIM_SLUGS = new Set([
   "phim-bo-dang-chieu",
   "phim-bo-hoan-thanh",
   "phim-sap-chieu",
+  "subteam",
 ]);
 
 // Helper function to build full image URL cleanly
@@ -42,7 +43,7 @@ export function getImageUrl(path: string): string {
 }
 
 // Global NSFW Filter
-const filterNSFW = (movies: Movie[]) => {
+export const filterNSFW = (movies: Movie[]) => {
   if (!movies) return [];
   return movies.filter(
     (movie) =>
@@ -52,12 +53,75 @@ const filterNSFW = (movies: Movie[]) => {
   );
 };
 
-// In-flight deduplication cache
+/**
+ * Safely extracts and deduplicates array of Movie items from various API response shapes.
+ */
+export function extractMovieItems(payload: any): Movie[] {
+  if (!payload || typeof payload !== "object") return [];
+
+  let rawList: any[] = [];
+  if (Array.isArray(payload.items)) {
+    rawList = payload.items;
+  } else if (Array.isArray(payload.data?.items)) {
+    rawList = payload.data.items;
+  } else if (Array.isArray(payload.data?.data?.items)) {
+    rawList = payload.data.data.items;
+  }
+
+  if (!rawList || rawList.length === 0) return [];
+
+  const seenSlugs = new Set<string>();
+  const result: Movie[] = [];
+
+  for (const item of rawList) {
+    if (!item || typeof item !== "object") continue;
+    const slug = (item.slug || item._id || "").toString().trim();
+    if (!slug) continue;
+    if (seenSlugs.has(slug)) continue;
+
+    seenSlugs.add(slug);
+    result.push(item);
+  }
+
+  return filterNSFW(result);
+}
+
+// In-memory Server Cache & In-flight Deduplication
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+  ttlMs: number;
+}
+
+const serverMemoryCache = new Map<string, CacheEntry>();
 const inFlightRequests = new Map<string, Promise<any>>();
+
+export function clearServerCache() {
+  serverMemoryCache.clear();
+  inFlightRequests.clear();
+}
+
+export function getCachedServerData(key: string, allowStale = true): any | null {
+  const entry = serverMemoryCache.get(key);
+  if (!entry) return null;
+  const isFresh = Date.now() - entry.timestamp <= entry.ttlMs;
+  if (isFresh || allowStale) {
+    return entry.data;
+  }
+  return null;
+}
+
+export function setCachedServerData(key: string, data: any, ttlSeconds: number = 300) {
+  serverMemoryCache.set(key, {
+    data,
+    timestamp: Date.now(),
+    ttlMs: ttlSeconds * 1000,
+  });
+}
 
 export async function safeFetchOPhim(
   pathWithQuery: string,
-  options?: { revalidate?: number }
+  options?: { revalidate?: number; ttlSeconds?: number }
 ): Promise<any> {
   const isServer = typeof window === "undefined";
   const cleanPath = pathWithQuery.replace(/^\/+/, "");
@@ -66,6 +130,16 @@ export async function safeFetchOPhim(
     ? `${BASE_URL}/${cleanPath}`
     : `/api/providers/ophim/${cleanPath}`;
 
+  const cacheKey = cleanPath;
+  const ttl = options?.ttlSeconds ?? options?.revalidate ?? 300;
+
+  // Check fresh in-memory cache first
+  const cachedFresh = getCachedServerData(cacheKey, false);
+  if (cachedFresh !== null) {
+    return cachedFresh;
+  }
+
+  // Deduplicate concurrent in-flight requests
   if (inFlightRequests.has(fullUrl)) {
     return inFlightRequests.get(fullUrl);
   }
@@ -94,6 +168,7 @@ export async function safeFetchOPhim(
         clearTimeout(timeoutId);
 
         if (response.status === 404) {
+          // Do not retry 404
           return null;
         }
 
@@ -103,15 +178,19 @@ export async function safeFetchOPhim(
         }
 
         if (!response.ok) {
-          return null;
+          // Fallback to stale cache if available
+          return getCachedServerData(cacheKey, true);
         }
 
         const contentType = response.headers.get("content-type") || "";
         if (!contentType.includes("application/json") && !contentType.includes("text/plain")) {
-          return null;
+          return getCachedServerData(cacheKey, true);
         }
 
         const data = await response.json();
+        if (data) {
+          setCachedServerData(cacheKey, data, ttl);
+        }
         return data;
       } catch (_err: unknown) {
         clearTimeout(timeoutId);
@@ -119,10 +198,11 @@ export async function safeFetchOPhim(
           await new Promise((resolve) => setTimeout(resolve, 300));
           continue;
         }
-        return null;
+        // Fallback to stale cache on network failure or timeout
+        return getCachedServerData(cacheKey, true);
       }
     }
-    return null;
+    return getCachedServerData(cacheKey, true);
   })();
 
   inFlightRequests.set(fullUrl, fetchPromise);
@@ -133,38 +213,35 @@ export async function safeFetchOPhim(
   }
 }
 
-// Fetch newly updated movies
+// Fetch newly updated movies (TTL: 3 mins)
 export async function getNewlyUpdatedMovies(page: number = 1) {
   const data = await safeFetchOPhim(`danh-sach/phim-moi-cap-nhat?page=${page}`, {
-    revalidate: 3600,
+    revalidate: 180,
+    ttlSeconds: 180,
   });
-  if (!data) return { items: [] };
-  if (data.items) {
-    data.items = filterNSFW(data.items);
-  }
-  return data;
+  const items = extractMovieItems(data);
+  return { items, data: { items } };
 }
 
-// Fetch movies by type (phim-le, phim-bo, hoat-hinh, tv-shows, etc.)
+// Fetch movies by type (phim-le, phim-bo, hoat-hinh, tv-shows, etc.) (TTL: 10 mins)
 export async function getMoviesByType(type: string, page: number = 1, limit: number = 24) {
   if (UNSUPPORTED_OPHIM_SLUGS.has(type)) {
     return { data: { items: [], params: { pagination: { totalItems: 0 } } } };
   }
 
   const data = await safeFetchOPhim(`v1/api/danh-sach/${type}?page=${page}&limit=${limit}`, {
-    revalidate: 3600,
+    revalidate: 600,
+    ttlSeconds: 600,
   });
-  if (!data) return { data: { items: [], params: { pagination: { totalItems: 0 } } } };
-  if (data.data?.items) {
-    data.data.items = filterNSFW(data.data.items);
-  }
-  return data;
+  const items = extractMovieItems(data);
+  return { data: { items, params: { pagination: { totalItems: items.length } } } };
 }
 
-// Fetch movies by genre
+// Fetch movies by genre (TTL: 10 mins)
 export async function getMoviesByGenre(genreSlug: string, page: number = 1) {
   const data = await safeFetchOPhim(`v1/api/the-loai/${genreSlug}?page=${page}`, {
-    revalidate: 3600,
+    revalidate: 600,
+    ttlSeconds: 600,
   });
   if (!data) return { data: { items: [] } };
   if (data.data?.items) {
@@ -173,10 +250,11 @@ export async function getMoviesByGenre(genreSlug: string, page: number = 1) {
   return data;
 }
 
-// Fetch movies by country
+// Fetch movies by country (TTL: 10 mins)
 export async function getMoviesByCountry(countrySlug: string, page: number = 1) {
   const data = await safeFetchOPhim(`v1/api/quoc-gia/${countrySlug}?page=${page}`, {
-    revalidate: 3600,
+    revalidate: 600,
+    ttlSeconds: 600,
   });
   if (!data) return { data: { items: [] } };
   if (data.data?.items) {
@@ -185,11 +263,11 @@ export async function getMoviesByCountry(countrySlug: string, page: number = 1) 
   return data;
 }
 
-// Search movies
+// Search movies (TTL: 60 seconds)
 export async function searchMovies(keyword: string, page: number = 1) {
   const data = await safeFetchOPhim(
     `v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&page=${page}`,
-    { revalidate: 60 }
+    { revalidate: 60, ttlSeconds: 60 }
   );
   if (!data) return { data: { items: [] } };
   if (data.data?.items) {
@@ -266,7 +344,7 @@ export async function advancedSearch(params: {
 
 // Fetch movie details by slug
 export async function getMovieDetail(slug: string) {
-  const data = await safeFetchOPhim(`phim/${slug}`, { revalidate: 3600 });
+  const data = await safeFetchOPhim(`phim/${slug}`, { revalidate: 600, ttlSeconds: 600 });
   if (!data) return null;
 
   if (data.movie?.category?.some((cat: any) => cat.slug === "phim-18")) {
@@ -310,9 +388,9 @@ export async function getMovieDetailPhimApi(slug: string) {
   }
 }
 
-// Fetch categories (genres)
+// Categories list (TTL: 30 mins)
 export async function getCategories() {
-  const data = await safeFetchOPhim(`v1/api/the-loai`, { revalidate: 86400 });
+  const data = await safeFetchOPhim(`v1/api/the-loai`, { revalidate: 1800, ttlSeconds: 1800 });
   if (!data) return { data: { items: [] } };
   if (data.data?.items) {
     data.data.items = data.data.items.filter((cat: any) => cat.slug !== "phim-18");
@@ -320,25 +398,17 @@ export async function getCategories() {
   return data;
 }
 
-// Fetch countries
+// Countries list (TTL: 30 mins)
 export async function getCountries() {
-  const data = await safeFetchOPhim(`v1/api/quoc-gia`, { revalidate: 86400 });
+  const data = await safeFetchOPhim(`v1/api/quoc-gia`, { revalidate: 1800, ttlSeconds: 1800 });
   return data || { data: { items: [] } };
 }
 
-// Movie types for navigation and homepage
 export const movieTypes = [
-  { name: "Phim Mới", slug: "phim-moi", icon: "Sparkles" },
-  { name: "Phim Lẻ", slug: "phim-le", icon: "Film" },
-  { name: "Phim Bộ", slug: "phim-bo", icon: "Tv" },
-  { name: "Hoạt Hình", slug: "hoat-hinh", icon: "Gamepad2" },
-  { name: "TV Shows", slug: "tv-shows", icon: "Monitor" },
-  { name: "Vietsub", slug: "phim-vietsub", icon: "Languages" },
-  { name: "Thuyết Minh", slug: "phim-thuyet-minh", icon: "Mic2" },
-  { name: "Lồng Tiếng", slug: "phim-long-tieng", icon: "Volume2" },
-  { name: "Bộ Đang Chiếu", slug: "phim-bo-dang-chieu", icon: "PlayCircle", unsupportedInOPhim: true },
-  { name: "Bộ Hoàn Thành", slug: "phim-bo-hoan-thanh", icon: "CheckCircle2", unsupportedInOPhim: true },
-  { name: "Sắp Chiếu", slug: "phim-sap-chieu", icon: "Calendar", unsupportedInOPhim: true },
-  { name: "Chiếu Rạp", slug: "phim-chieu-rap", icon: "Ticket" },
-  { name: "Subteam", slug: "subteam", icon: "Users" },
+  { name: "Phim mới", slug: "phim-moi" },
+  { name: "Phim bộ", slug: "phim-bo" },
+  { name: "Phim lẻ", slug: "phim-le" },
+  { name: "TV Shows", slug: "tv-shows" },
+  { name: "Hoạt hình", slug: "hoat-hinh" },
+  { name: "Phim chiếu rạp", slug: "phim-chieu-rap" },
 ];
