@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar, Clock, Eye, Globe2, Play, Users2 } from "lucide-react";
 import { getMovieDetail, getImageUrl } from "@/lib/api/ophim";
+import { getDefaultWatchEpisode } from "@/lib/player/watch-helpers";
 import FavoriteButton from "./FavoriteButton";
 import EpisodeList from "./EpisodeList";
 import { useMovieData } from "@/lib/hooks/use-movie-data";
@@ -138,16 +139,31 @@ export default function MovieDetailPage({ params }: Props) {
                         )}
 
                         <div className="mt-7 flex flex-wrap items-center justify-center gap-3 md:justify-start">
-                            {episodes.length > 0 && episodes[0]?.server_data?.length > 0 && (
-                                <Link
-                                    href={`/xem-phim/${movie.slug}/${episodes[0].server_data[0].slug}`}
-                                    prefetch={false}
-                                    className="button-primary min-w-36"
-                                >
-                                    <Play className="h-4 w-4 fill-current" />
-                                    Xem phim
-                                </Link>
-                            )}
+                            {(() => {
+                                const defaultEp = getDefaultWatchEpisode(episodes);
+                                if (defaultEp && defaultEp.slug) {
+                                    return (
+                                        <Link
+                                            href={`/xem-phim/${movie.slug}/${defaultEp.slug}`}
+                                            prefetch={false}
+                                            className="button-primary min-w-36"
+                                        >
+                                            <Play className="h-4 w-4 fill-current" />
+                                            Xem phim
+                                        </Link>
+                                    );
+                                }
+                                return (
+                                    <button
+                                        type="button"
+                                        disabled
+                                        className="button-secondary min-w-36 cursor-not-allowed opacity-50"
+                                    >
+                                        <Play className="h-4 w-4" />
+                                        Chưa có nguồn phát
+                                    </button>
+                                );
+                            })()}
                             <FavoriteButton movie={movie} />
                         </div>
                     </div>

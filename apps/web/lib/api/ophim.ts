@@ -495,6 +495,38 @@ export async function getMovieDetailNguonC(slug: string) {
   }
 }
 
+// Search NguonC API
+export async function searchNguonC(keyword: string) {
+  if (!keyword || !keyword.trim()) return [];
+  try {
+    const response = await fetch(
+      `https://phim.nguonc.com/api/films/search?keyword=${encodeURIComponent(keyword.trim())}`,
+      { next: { revalidate: 3600 } }
+    );
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data.items) ? data.items : Array.isArray(data.data?.items) ? data.data.items : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+// Search PhimApi
+export async function searchPhimApi(keyword: string) {
+  if (!keyword || !keyword.trim()) return [];
+  try {
+    const response = await fetch(
+      `https://phimapi.com/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword.trim())}`,
+      { next: { revalidate: 3600 } }
+    );
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data.data?.items) ? data.data.items : Array.isArray(data.items) ? data.items : [];
+  } catch (error) {
+    return [];
+  }
+}
+
 // Fetch movie details from PhimApi
 export async function getMovieDetailPhimApi(slug: string) {
   try {
