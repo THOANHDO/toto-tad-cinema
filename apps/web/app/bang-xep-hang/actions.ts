@@ -15,7 +15,9 @@ export interface LeaderboardMovieItem {
 export interface CommunityCommentItem {
   id: string;
   user_id: string;
+  parent_id?: string | null;
   author_name: string;
+  reply_to_name?: string | null;
   movie_slug: string;
   movie_title: string;
   poster_url: string | null;
@@ -23,6 +25,7 @@ export interface CommunityCommentItem {
   content: string;
   created_at: string;
   is_owner?: boolean;
+  replies?: CommunityCommentItem[];
 }
 
 export async function getLeaderboardMovies(): Promise<LeaderboardMovieItem[]> {
@@ -95,21 +98,23 @@ export async function getLeaderboardMovies(): Promise<LeaderboardMovieItem[]> {
   }
 }
 
-export async function getRecentCommunityComments(limit = 30): Promise<CommunityCommentItem[]> {
+export async function getRecentCommunityComments(limit = 40): Promise<CommunityCommentItem[]> {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return [];
 
   try {
     const { data: comments, error } = await supabase
       .from("sr_comments")
-      .select("id, user_id, movie_slug, movie_title, poster_url, episode_name, content, created_at")
+      .select("id, user_id, parent_id, movie_slug, movie_title, poster_url, episode_name, content, created_at")
       .order("created_at", { ascending: false })
       .limit(limit);
 
     if (error || !comments) return [];
 
-    // Fetch user accounts
     const userIds = Array.from(new Set(comments.map((c) => c.user_id)));
+    const parentIds = comments.filter((c) => c.parent_id).map((c) => c.parent_id as string);
+
+    // Fetch user display names
     const { data: users } = await supabase
       .from("user_accounts")
       .select("user_id, display_name")
@@ -122,13 +127,29 @@ export async function getRecentCommunityComments(limit = 30): Promise<CommunityC
       }
     }
 
-    // Get current user id if any
+    // Fetch parent comment authors if any
+    const parentUserMap = new Map<string, string>();
+    if (parentIds.length > 0) {
+      const { data: parents } = await supabase
+        .from("sr_comments")
+        .select("id, user_id")
+        .in("id", parentIds);
+
+      if (parents) {
+        for (const p of parents) {
+          const parentAuthor = userMap.get(p.user_id) || "Thành viên";
+          parentUserMap.set(p.id, parentAuthor);
+        }
+      }
+    }
+
     const { data: authData } = await supabase.auth.getUser();
     const currentUserId = authData?.user?.id;
 
     return comments.map((c) => ({
       ...c,
       author_name: userMap.get(c.user_id) || "Thành viên",
+      reply_to_name: c.parent_id ? parentUserMap.get(c.parent_id) || null : null,
       is_owner: currentUserId ? c.user_id === currentUserId : false,
     }));
   } catch (err) {
@@ -145,10 +166,10 @@ export async function getMovieComments(movieSlug: string): Promise<CommunityComm
   try {
     const { data: comments, error } = await supabase
       .from("sr_comments")
-      .select("id, user_id, movie_slug, movie_title, poster_url, episode_name, content, created_at")
+      .select("id, user_id, parent_id, movie_slug, movie_title, poster_url, episode_name, content, created_at")
       .eq("movie_slug", movieSlug)
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .order("created_at", { ascending: true })
+      .limit(100);
 
     if (error || !comments) return [];
 
@@ -168,11 +189,36 @@ export async function getMovieComments(movieSlug: string): Promise<CommunityComm
     const { data: authData } = await supabase.auth.getUser();
     const currentUserId = authData?.user?.id;
 
-    return comments.map((c) => ({
+    const rawList: CommunityCommentItem[] = comments.map((c) => ({
       ...c,
       author_name: userMap.get(c.user_id) || "Thành viên",
       is_owner: currentUserId ? c.user_id === currentUserId : false,
+      replies: [],
     }));
+
+    // Build threaded hierarchy
+    const itemMap = new Map<string, CommunityCommentItem>();
+    const rootComments: CommunityCommentItem[] = [];
+
+    for (const item of rawList) {
+      itemMap.set(item.id, item);
+    }
+
+    for (const item of rawList) {
+      if (item.parent_id && itemMap.has(item.parent_id)) {
+        const parent = itemMap.get(item.parent_id)!;
+        item.reply_to_name = parent.author_name;
+        parent.replies = parent.replies || [];
+        parent.replies.push(item);
+      } else {
+        rootComments.push(item);
+      }
+    }
+
+    // Sort root comments newest first
+    rootComments.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return rootComments;
   } catch (err) {
     console.error("Failed to load movie comments:", err);
     return [];
@@ -184,6 +230,7 @@ export async function postMovieComment(data: {
   movie_title: string;
   poster_url?: string | null;
   episode_name?: string | null;
+  parent_id?: string | null;
   content: string;
 }) {
   const { user } = await requireActiveAccount();
@@ -200,18 +247,24 @@ export async function postMovieComment(data: {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { error: "Database not configured" };
 
-  const { error } = await supabase.from("sr_comments").insert({
+  const insertPayload: Record<string, unknown> = {
     user_id: user.id,
     movie_slug: data.movie_slug,
     movie_title: data.movie_title || data.movie_slug,
     poster_url: data.poster_url || null,
     episode_name: data.episode_name || null,
     content,
-  });
+  };
+
+  if (data.parent_id) {
+    insertPayload.parent_id = data.parent_id;
+  }
+
+  const { error } = await supabase.from("sr_comments").insert(insertPayload);
 
   if (error) {
     console.error("Failed to insert comment:", error);
-    return { error: "Không thể gửi bình luận, vui lòng thử lại." };
+    return { error: `Không thể gửi bình luận: ${error.message}` };
   }
 
   revalidatePath(`/phim/${data.movie_slug}`);

@@ -245,13 +245,18 @@ export default async function LeaderboardPage() {
                     className="rounded-xl border border-white/6 bg-white/[0.02] p-3.5 transition-colors hover:bg-white/[0.04]"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <div className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
                           {cmt.author_name ? cmt.author_name.charAt(0).toUpperCase() : "U"}
                         </div>
                         <span className="text-xs font-bold text-white">
                           {cmt.author_name}
                         </span>
+                        {cmt.reply_to_name && (
+                          <span className="text-[10px] text-foreground-muted">
+                            trả lời <strong className="text-primary/90 font-medium">@{cmt.reply_to_name}</strong>
+                          </span>
+                        )}
                       </div>
                       <span className="text-[10px] text-foreground-muted">
                         {new Date(cmt.created_at).toLocaleDateString("vi-VN", {
