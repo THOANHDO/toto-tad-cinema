@@ -30,6 +30,15 @@ export type PlyrPlayerHandle = {
   toggleFullscreen: () => void;
 };
 
+function isAppleDevice() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ||
+    Boolean((navigator as any).standalone)
+  );
+}
+
 export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<any>(null);
@@ -46,7 +55,7 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
     getInternalPlayer: () => playerRef.current,
     toggleFullscreen: () => {
       const video = videoRef.current;
-      if (video && typeof (video as any).webkitEnterFullscreen === "function") {
+      if (video && typeof (video as any).webkitEnterFullscreen === "function" && isAppleDevice()) {
         (video as any).webkitEnterFullscreen();
       } else if (playerRef.current?.fullscreen) {
         playerRef.current.fullscreen.toggle();
@@ -185,6 +194,22 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
 
     const handleWaiting = () => onWaiting?.();
 
+    const handleWebkitBeginFullscreen = () => {
+      if (playerRef.current && !playerRef.current.fullscreen?.active) {
+        try {
+          playerRef.current.fullscreen?.enter();
+        } catch (_e) {}
+      }
+    };
+
+    const handleWebkitEndFullscreen = () => {
+      if (playerRef.current && playerRef.current.fullscreen?.active) {
+        try {
+          playerRef.current.fullscreen?.exit();
+        } catch (_e) {}
+      }
+    };
+
     video.addEventListener("error", handleNativeVideoError);
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("resize", handleResize);
@@ -192,6 +217,8 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("loadeddata", handleLoadedData);
     video.addEventListener("canplay", handleCanPlay);
+    video.addEventListener("webkitbeginfullscreen", handleWebkitBeginFullscreen);
+    video.addEventListener("webkitendfullscreen", handleWebkitEndFullscreen);
 
     const initPlayer = (Constructor: any) => {
       if (!Constructor || !video) return;
@@ -201,12 +228,48 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
         const player = new Constructor(video, defaultOptions);
         playerRef.current = player;
 
-        if (hlsUrl && Hls.isSupported()) {
+        const isApple = isAppleDevice();
+        const canPlayNativeHls = video.canPlayType("application/vnd.apple.mpegurl");
+
+        // Hook fullscreen button click directly on Apple devices
+        if (isApple) {
+          const container = player.elements?.container;
+          if (container) {
+            const fsBtn = container.querySelector('[data-plyr="fullscreen"]');
+            if (fsBtn) {
+              fsBtn.addEventListener(
+                "click",
+                (e: Event) => {
+                  if (video && typeof (video as any).webkitEnterFullscreen === "function") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    (video as any).webkitEnterFullscreen();
+                  }
+                },
+                { capture: true }
+              );
+            }
+          }
+        }
+
+        if (hlsUrl && isApple && canPlayNativeHls) {
+          // Native Safari HLS on iOS, iPadOS, Safari
+          video.src = hlsUrl;
+          video.addEventListener(
+            "loadedmetadata",
+            () => {
+              onReady?.(player);
+              if (startTime && startTime > 0) video.currentTime = startTime;
+              player.play().catch(() => {});
+            },
+            { once: true }
+          );
+        } else if (hlsUrl && Hls.isSupported()) {
           const hls = new Hls({
             ...(startTime && startTime > 0 ? { startPosition: startTime } : {}),
-            manifestLoadingMaxRetry: 1,
-            levelLoadingMaxRetry: 1,
-            fragLoadingMaxRetry: 2,
+            manifestLoadingMaxRetry: 2,
+            levelLoadingMaxRetry: 2,
+            fragLoadingMaxRetry: 3,
           });
           hlsRef.current = hls;
           hls.loadSource(hlsUrl);
@@ -230,7 +293,7 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
             const detailsStr = String(data.details || "");
             if (detailsStr === "fragLoadError" || detailsStr === "fragLoadTimeout") {
               fragErrorCountRef.current += 1;
-              if (fragErrorCountRef.current >= 2) {
+              if (fragErrorCountRef.current >= 3) {
                 cleanup();
                 onError?.(classifyHlsError(data), attemptId);
                 return;
@@ -242,8 +305,7 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
               onError?.(classifyHlsError(data), attemptId);
             }
           });
-        } else if (hlsUrl && video.canPlayType("application/vnd.apple.mpegurl")) {
-          // Native Safari HLS
+        } else if (hlsUrl && canPlayNativeHls) {
           video.src = hlsUrl;
           video.addEventListener(
             "loadedmetadata",
@@ -299,6 +361,8 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
       video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("loadeddata", handleLoadedData);
       video.removeEventListener("canplay", handleCanPlay);
+      video.removeEventListener("webkitbeginfullscreen", handleWebkitBeginFullscreen);
+      video.removeEventListener("webkitendfullscreen", handleWebkitEndFullscreen);
       cleanup();
       if (cleanupEventListener) cleanupEventListener();
     };
@@ -309,7 +373,6 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
       <video
         ref={videoRef}
         className="plyr-react block h-full w-full object-contain"
-        crossOrigin="anonymous"
         playsInline
         {...{ "webkit-playsinline": "true" }}
       />

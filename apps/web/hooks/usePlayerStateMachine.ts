@@ -288,8 +288,9 @@ export function usePlayerStateMachine({ sources, episodeKey, initialTime = 0 }: 
 
   // Actions wrapped in useCallback
   const reportMediaPlaying = useCallback((sourceId: string, attemptId: number) => {
+    clearTimers();
     dispatch({ type: "MEDIA_PLAYING", sourceId, attemptId });
-  }, []);
+  }, [clearTimers]);
 
   const reportVideoHealthy = useCallback((sourceId: string, attemptId: number) => {
     clearTimers();
@@ -344,13 +345,24 @@ export function usePlayerStateMachine({ sources, episodeKey, initialTime = 0 }: 
 
   // Handle HLS startup timeout (14 seconds)
   useEffect(() => {
-    if (!activeSource || activeSource.kind !== "hls" || state.phase === "failed" || state.phase === "healthy") {
+    if (
+      !activeSource ||
+      activeSource.kind !== "hls" ||
+      state.phase === "failed" ||
+      state.phase === "healthy" ||
+      state.phase === "media_playing"
+    ) {
       return;
     }
 
     startupTimerRef.current = setTimeout(() => {
       const currentState = stateRef.current;
-      if (currentState.phase !== "healthy" && !currentState.manualSelected && activeSource) {
+      if (
+        currentState.phase !== "healthy" &&
+        currentState.phase !== "media_playing" &&
+        !currentState.manualSelected &&
+        activeSource
+      ) {
         reportSourceError(activeSource.id, currentState.attemptId, "startup_timeout");
       }
     }, STARTUP_TIMEOUT_MS);
