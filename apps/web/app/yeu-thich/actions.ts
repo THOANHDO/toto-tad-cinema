@@ -23,7 +23,10 @@ export async function toggleFavorite(movieData: FavoriteInput) {
     .eq("movie_slug", validated.data.movie_slug)
     .maybeSingle();
 
-  if (readError) return { error: "Không thể cập nhật phim yêu thích" };
+  if (readError) {
+    console.error("toggleFavorite readError:", readError);
+    return { error: `Lỗi đọc dữ liệu: ${readError.message}` };
+  }
 
   if (existing) {
     const { error } = await supabase
@@ -32,7 +35,10 @@ export async function toggleFavorite(movieData: FavoriteInput) {
       .eq("id", existing.id)
       .eq("user_id", user.id);
 
-    if (error) return { error: "Không thể cập nhật phim yêu thích" };
+    if (error) {
+      console.error("toggleFavorite deleteError:", error);
+      return { error: `Lỗi xóa phim: ${error.message}` };
+    }
   } else {
     const { error } = await supabase.from("sr_favorites").insert({
       user_id: user.id,
@@ -41,10 +47,14 @@ export async function toggleFavorite(movieData: FavoriteInput) {
       poster_url: validated.data.poster_url,
     });
 
-    if (error) return { error: "Không thể cập nhật phim yêu thích" };
+    if (error) {
+      console.error("toggleFavorite insertError:", error);
+      return { error: `Lỗi lưu phim: ${error.message}` };
+    }
   }
 
   revalidatePath("/yeu-thich");
+  revalidatePath("/bang-xep-hang");
   return { success: true };
 }
 
