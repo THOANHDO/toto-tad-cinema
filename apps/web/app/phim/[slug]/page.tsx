@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,6 +9,8 @@ import { getMovieDetail, getImageUrl } from "@/lib/api/ophim";
 import { getDefaultWatchEpisode } from "@/lib/player/watch-helpers";
 import FavoriteButton from "./FavoriteButton";
 import EpisodeList from "./EpisodeList";
+import MovieComments from "@/components/community/MovieComments";
+import { getMovieComments, type CommunityCommentItem } from "@/app/bang-xep-hang/actions";
 import { useMovieData } from "@/lib/hooks/use-movie-data";
 
 interface Props {
@@ -17,6 +19,11 @@ interface Props {
 
 export default function MovieDetailPage({ params }: Props) {
     const { slug } = use(params);
+    const [comments, setComments] = useState<CommunityCommentItem[]>([]);
+
+    useEffect(() => {
+        getMovieComments(slug).then(setComments);
+    }, [slug]);
 
     const { data, loading } = useMovieData(
         `movie-detail-${slug}`,
@@ -222,6 +229,15 @@ export default function MovieDetailPage({ params }: Props) {
                         <EpisodeList episodes={episodes} movieSlug={movie.slug} />
                     </section>
                 )}
+
+                <div className="mt-8">
+                    <MovieComments
+                        movieSlug={slug}
+                        movieTitle={movie.name}
+                        posterUrl={movie.thumb_url}
+                        initialComments={comments}
+                    />
+                </div>
             </div>
         </div>
     );

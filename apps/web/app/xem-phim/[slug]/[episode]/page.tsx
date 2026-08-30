@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use, useMemo, useEffect, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertCircle, ChevronRight, Home, PlayCircle } from "lucide-react";
@@ -10,6 +10,8 @@ import VideoPlayer from "./VideoPlayer";
 import EpisodeSelector from "./EpisodeSelector";
 import MovieInfoDetails from "@/components/movie/MovieInfoDetails";
 import SplashScreen from "@/components/ui/SplashScreen";
+import MovieComments from "@/components/community/MovieComments";
+import { getMovieComments, type CommunityCommentItem } from "@/app/bang-xep-hang/actions";
 import { useMovieData } from "@/lib/hooks/use-movie-data";
 
 interface Props {
@@ -21,6 +23,11 @@ export default function WatchPage({ params, searchParams }: Props) {
   const { slug, episode } = use(params);
   const { sv } = use(searchParams);
   const requestedServerIndex = sv ? parseInt(sv, 10) : undefined;
+  const [comments, setComments] = useState<CommunityCommentItem[]>([]);
+
+  useEffect(() => {
+    getMovieComments(slug).then(setComments);
+  }, [slug]);
 
   const { data: resolution, loading } = useMovieData(`watch-resolution-${slug}`, () =>
     resolveMultiProviderMovies(slug)
@@ -128,7 +135,17 @@ export default function WatchPage({ params, searchParams }: Props) {
         </div>
       </section>
 
-      <div id="movie-info" className="site-container scroll-mt-24">
+      <div className="site-container mt-8">
+        <MovieComments
+          movieSlug={slug}
+          movieTitle={movie.name}
+          posterUrl={movie.thumb_url}
+          episodeName={`Tập ${episode}`}
+          initialComments={comments}
+        />
+      </div>
+
+      <div id="movie-info" className="site-container mt-8 scroll-mt-24">
         <MovieInfoDetails movie={movie} peoples={[]} />
       </div>
     </div>

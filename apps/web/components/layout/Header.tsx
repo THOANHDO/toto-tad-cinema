@@ -25,6 +25,7 @@ import {
     PlayCircle,
     Search,
     Ticket,
+    Trophy,
     Tv,
     Users,
     Volume2,
@@ -38,6 +39,7 @@ const navItems = [
     { name: "Phim Lẻ", href: "/danh-sach/phim-le", icon: Film },
     { name: "Phim Bộ", href: "/danh-sach/phim-bo", icon: Tv },
     { name: "Hoạt Hình", href: "/danh-sach/hoat-hinh", icon: Gamepad2 },
+    { name: "Bảng Xếp Hạng", href: "/bang-xep-hang", icon: Trophy },
 ];
 
 const exploreItems = [
