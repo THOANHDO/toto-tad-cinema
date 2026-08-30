@@ -12,6 +12,7 @@ import {
 } from "@/app/bang-xep-hang/actions";
 import MentionTextarea from "./MentionTextarea";
 import CommentContent from "./CommentContent";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface MovieCommentsProps {
   movieSlug: string;
@@ -33,6 +34,7 @@ export default function MovieComments({
   const [mainContent, setMainContent] = useState("");
   const [replyContent, setReplyContent] = useState("");
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -102,13 +104,32 @@ export default function MovieComments({
     });
   };
 
-  const handleDelete = (commentId: string) => {
-    startTransition(async () => {
-      const res = await deleteMovieComment(commentId, movieSlug);
-      if (!res?.error) {
-        await refreshComments();
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+    const idToDelete = deleteTargetId;
+    setDeleteTargetId(null);
+
+    // Optimistic fast deletion (0ms latency for UI)
+    const previousComments = [...comments];
+    setComments((prev) =>
+      prev
+        .filter((c) => c.id !== idToDelete)
+        .map((c) => ({
+          ...c,
+          replies: c.replies?.filter((r) => r.id !== idToDelete) || [],
+        }))
+    );
+
+    try {
+      const res = await deleteMovieComment(idToDelete, movieSlug);
+      if (res?.error) {
+        setComments(previousComments);
+        setErrorMsg(res.error);
       }
-    });
+    } catch (_err) {
+      setComments(previousComments);
+      setErrorMsg("Không thể xóa bình luận, vui lòng thử lại.");
+    }
   };
 
   const startReply = (targetId: string, authorName: string) => {
@@ -217,7 +238,7 @@ export default function MovieComments({
                   {comment.is_owner && (
                     <button
                       type="button"
-                      onClick={() => handleDelete(comment.id)}
+                      onClick={() => setDeleteTargetId(comment.id)}
                       className="inline-flex items-center gap-1 text-xs text-foreground-muted transition-colors hover:text-error"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -286,7 +307,7 @@ export default function MovieComments({
                           {reply.is_owner && (
                             <button
                               type="button"
-                              onClick={() => handleDelete(reply.id)}
+                              onClick={() => setDeleteTargetId(reply.id)}
                               className="inline-flex items-center gap-1 text-[11px] text-foreground-muted hover:text-error"
                             >
                               <Trash2 className="h-2.5 w-2.5" />
@@ -324,6 +345,16 @@ export default function MovieComments({
           </div>
         ))}
       </div>
+
+      {/* Confirm Delete Popup */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTargetId)}
+        title="Xóa bình luận này?"
+        description="Bình luận của bạn sẽ bị xóa khỏi bộ phim và không thể khôi phục."
+        confirmLabel="Xóa bình luận"
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDelete}
+      />
     </section>
   );
 }

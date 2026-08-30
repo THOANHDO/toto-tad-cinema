@@ -26,6 +26,7 @@ import {
 } from "@/app/bang-xep-hang/actions";
 import MentionTextarea from "./MentionTextarea";
 import CommentContent from "./CommentContent";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface FamilyCommunitySectionProps {
   initialLeaderboard: LeaderboardMovieItem[];
@@ -45,6 +46,7 @@ export default function FamilyCommunitySection({
   const [accounts] = useState<CommunityAccount[]>(initialAccounts);
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState("");
+  const [deleteTargetInfo, setDeleteTargetInfo] = useState<{ id: string; movieSlug?: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const refreshData = async () => {
@@ -86,13 +88,30 @@ export default function FamilyCommunitySection({
     });
   };
 
-  const handleDelete = (commentId: string, movieSlug?: string) => {
-    startTransition(async () => {
-      const res = await deleteMovieComment(commentId, movieSlug);
-      if (!res?.error) {
-        await refreshData();
+  const confirmDelete = async () => {
+    if (!deleteTargetInfo) return;
+    const { id, movieSlug } = deleteTargetInfo;
+    setDeleteTargetInfo(null);
+
+    // Optimistic delete: remove from UI immediately in 0ms!
+    const previousComments = [...comments];
+    setComments((prev) =>
+      prev
+        .filter((c) => c.id !== id)
+        .map((c) => ({
+          ...c,
+          replies: c.replies?.filter((r) => r.id !== id) || [],
+        }))
+    );
+
+    try {
+      const res = await deleteMovieComment(id, movieSlug);
+      if (res?.error) {
+        setComments(previousComments);
       }
-    });
+    } catch (_err) {
+      setComments(previousComments);
+    }
   };
 
   const formatRelativeTime = (isoString: string) => {
@@ -365,7 +384,7 @@ export default function FamilyCommunitySection({
                       {cmt.is_owner && (
                         <button
                           type="button"
-                          onClick={() => handleDelete(cmt.id, cmt.movie_slug)}
+                          onClick={() => setDeleteTargetInfo({ id: cmt.id, movieSlug: cmt.movie_slug })}
                           className="inline-flex items-center gap-1 text-[11px] text-foreground-muted hover:text-error"
                         >
                           <Trash2 className="h-3 w-3" />
@@ -428,7 +447,7 @@ export default function FamilyCommunitySection({
                               {reply.is_owner && (
                                 <button
                                   type="button"
-                                  onClick={() => handleDelete(reply.id, cmt.movie_slug)}
+                                  onClick={() => setDeleteTargetInfo({ id: reply.id, movieSlug: cmt.movie_slug })}
                                   className="inline-flex items-center gap-1 text-[10px] text-foreground-muted hover:text-error"
                                 >
                                   <Trash2 className="h-2.5 w-2.5" />
@@ -468,6 +487,16 @@ export default function FamilyCommunitySection({
           )}
         </section>
       </div>
+
+      {/* Confirm Delete Popup */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTargetInfo)}
+        title="Xóa bình luận này?"
+        description="Bình luận của bạn sẽ bị xóa khỏi hệ thống và không thể khôi phục."
+        confirmLabel="Xóa bình luận"
+        onClose={() => setDeleteTargetInfo(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

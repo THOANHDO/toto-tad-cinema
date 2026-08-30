@@ -127,10 +127,10 @@ export default function VideoPlayer({
         return;
       }
 
-      // Periodic sync every 10 seconds of playback or after 15s elapsed
+      // Periodic sync every 20 seconds of playback or after 25s elapsed
       if (
-        (curr > 0 && Math.abs(curr - lastSyncedTimeRef.current) >= 10) ||
-        (lastSyncTimestampRef.current > 0 && now - lastSyncTimestampRef.current >= 15000)
+        (curr > 0 && Math.abs(curr - lastSyncedTimeRef.current) >= 20) ||
+        (lastSyncTimestampRef.current > 0 && now - lastSyncTimestampRef.current >= 25000)
       ) {
         syncToServer(curr, dur);
       }
