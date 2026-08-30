@@ -32,7 +32,8 @@ export function resolveOPhimImageUrl(value?: string | null, baseUrl?: string): s
 
   const domain = baseUrl ? baseUrl.replace(/\/+$/, "") : "https://phimimg.com";
 
-  if (cleanPath.startsWith("uploads/movies/")) {
+  // If already prefixed with standard CDN upload paths (upload/vod/..., uploads/movies/...)
+  if (cleanPath.startsWith("upload/") || cleanPath.startsWith("uploads/")) {
     return `${domain}/${cleanPath}`;
   }
 

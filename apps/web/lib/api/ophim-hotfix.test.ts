@@ -49,6 +49,14 @@ describe("Image Resolver (resolveOPhimImageUrl)", () => {
     );
   });
 
+  test("formats upload/vod paths correctly without appending uploads/movies", () => {
+    const input = "upload/vod/20260420-1/36337b7bf2982c91f3761919a92852e3.jpg";
+    assert.strictEqual(
+      resolveOPhimImageUrl(input),
+      "https://phimimg.com/upload/vod/20260420-1/36337b7bf2982c91f3761919a92852e3.jpg"
+    );
+  });
+
   test("supports custom baseUrl parameter", () => {
     const input = "naruto.jpg";
     const customBase = "https://custom.cdn.com";
