@@ -70,18 +70,18 @@ describe("Home Data Loader & Resilience", () => {
     assert.deepEqual(cached, { items: [1, 2, 3] });
   });
 
-  test("6. Browser catalog requests target internal proxy, not direct ophim1.com", () => {
+  test("6. Browser catalog requests target internal proxy, not direct phimapi.com", () => {
     const isServer = typeof window === "undefined";
     const cleanPath = "v1/api/danh-sach/phim-le?page=1";
     const fullUrl = isServer
-      ? `https://ophim1.com/${cleanPath}`
+      ? `https://phimapi.com/${cleanPath}`
       : `/api/providers/ophim/${cleanPath}`;
 
     if (!isServer) {
       assert.equal(fullUrl.startsWith("/api/providers/ophim/"), true);
-      assert.equal(fullUrl.includes("ophim1.com"), false);
+      assert.equal(fullUrl.includes("phimapi.com"), false);
     } else {
-      assert.equal(fullUrl.startsWith("https://ophim1.com/"), true);
+      assert.equal(fullUrl.startsWith("https://phimapi.com/"), true);
     }
   });
 
@@ -89,7 +89,7 @@ describe("Home Data Loader & Resilience", () => {
     assert.equal(resolveOPhimImageUrl(""), "/placeholder.jpg");
     assert.equal(
       resolveOPhimImageUrl("uploads/movies/avatar.jpg"),
-      "https://img.ophim.live/uploads/movies/avatar.jpg"
+      "https://phimimg.com/uploads/movies/avatar.jpg"
     );
     assert.equal(
       resolveOPhimImageUrl("https://custom.domain/poster.jpg"),
@@ -119,10 +119,10 @@ describe("Home Data Loader & Resilience", () => {
 
   test("9. Server URL and Browser proxy URL remain strictly separated", () => {
     const path = "v1/api/danh-sach/phim-bo?page=1";
-    const serverUrl = `https://ophim1.com/${path}`;
+    const serverUrl = `https://phimapi.com/${path}`;
     const browserUrl = `/api/providers/ophim/${path}`;
 
-    assert.equal(serverUrl.startsWith("https://ophim1.com/"), true);
+    assert.equal(serverUrl.startsWith("https://phimapi.com/"), true);
     assert.equal(browserUrl.startsWith("/api/providers/ophim/"), true);
     assert.notEqual(serverUrl, browserUrl);
   });

@@ -1,7 +1,8 @@
 // OPhim API Service
 import { Movie } from "@/types/movie";
 
-const BASE_URL = process.env.NEXT_PUBLIC_OPHIM_API_URL || "https://ophim1.com";
+const BASE_URL = process.env.NEXT_PUBLIC_OPHIM_API_URL || "https://phimapi.com";
+const FALLBACK_BASE_URL = "https://phimapi.com";
 
 export const UNSUPPORTED_OPHIM_SLUGS = new Set([
   "phim-bo-dang-chieu",
@@ -29,7 +30,7 @@ export function resolveOPhimImageUrl(value?: string | null, baseUrl?: string): s
   // Remove duplicate uploads/movies prefixes if any
   cleanPath = cleanPath.replace(/^(uploads\/movies\/)+/, "uploads/movies/");
 
-  const domain = baseUrl ? baseUrl.replace(/\/+$/, "") : "https://img.ophim.live";
+  const domain = baseUrl ? baseUrl.replace(/\/+$/, "") : "https://phimimg.com";
 
   if (cleanPath.startsWith("uploads/movies/")) {
     return `${domain}/${cleanPath}`;
@@ -119,6 +120,44 @@ export function setCachedServerData(key: string, data: any, ttlSeconds: number =
   });
 }
 
+async function fetchFromUrl(
+  url: string,
+  isServer: boolean,
+  options?: { revalidate?: number }
+): Promise<any | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "application/json, text/plain, */*",
+      },
+      ...(isServer && options?.revalidate !== undefined
+        ? { next: { revalidate: options.revalidate } }
+        : {}),
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json") && !contentType.includes("text/plain")) {
+      return null;
+    }
+
+    return await response.json();
+  } catch (_err) {
+    clearTimeout(timeoutId);
+    return null;
+  }
+}
+
 export async function safeFetchOPhim(
   pathWithQuery: string,
   options?: { revalidate?: number; ttlSeconds?: number }
@@ -145,63 +184,21 @@ export async function safeFetchOPhim(
   }
 
   const fetchPromise = (async () => {
-    let attempts = 0;
-    const maxAttempts = 2; // 1 initial + 1 retry for 50x
+    // 1. Try primary request
+    let data = await fetchFromUrl(fullUrl, isServer, options);
 
-    while (attempts < maxAttempts) {
-      attempts++;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      try {
-        const response = await fetch(fullUrl, {
-          signal: controller.signal,
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            Accept: "application/json, text/plain, */*",
-          },
-          ...(isServer && options?.revalidate !== undefined
-            ? { next: { revalidate: options.revalidate } }
-            : {}),
-        });
-
-        clearTimeout(timeoutId);
-
-        if (response.status === 404) {
-          // Do not retry 404
-          return null;
-        }
-
-        if (response.status >= 500 && attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
-          continue;
-        }
-
-        if (!response.ok) {
-          // Fallback to stale cache if available
-          return getCachedServerData(cacheKey, true);
-        }
-
-        const contentType = response.headers.get("content-type") || "";
-        if (!contentType.includes("application/json") && !contentType.includes("text/plain")) {
-          return getCachedServerData(cacheKey, true);
-        }
-
-        const data = await response.json();
-        if (data) {
-          setCachedServerData(cacheKey, data, ttl);
-        }
-        return data;
-      } catch (_err: unknown) {
-        clearTimeout(timeoutId);
-        if (attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
-          continue;
-        }
-        // Fallback to stale cache on network failure or timeout
-        return getCachedServerData(cacheKey, true);
-      }
+    // 2. If server-side request failed or returned empty/null and BASE_URL is custom/failing, fallback to FALLBACK_BASE_URL
+    if (!data && isServer && BASE_URL !== FALLBACK_BASE_URL) {
+      const fallbackUrl = `${FALLBACK_BASE_URL}/${cleanPath}`;
+      data = await fetchFromUrl(fallbackUrl, isServer, options);
     }
+
+    if (data) {
+      setCachedServerData(cacheKey, data, ttl);
+      return data;
+    }
+
+    // Fallback to stale cache if available
     return getCachedServerData(cacheKey, true);
   })();
 

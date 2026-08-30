@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const OPHIM_BASE_URL = "https://ophim1.com";
+const OPHIM_BASE_URL = process.env.NEXT_PUBLIC_OPHIM_API_URL || "https://phimapi.com";
+const FALLBACK_BASE_URL = "https://phimapi.com";
 
 // Blocked patterns: no external URLs, video files, or embed proxying
 const BLOCKED_PATTERNS = [
@@ -11,6 +12,39 @@ const BLOCKED_PATTERNS = [
   /^https?:\/\//i,
   /^\/\//,
 ];
+
+async function fetchUpstream(baseUrl: string, pathString: string, searchParams: string): Promise<any | null> {
+  const upstreamUrl = `${baseUrl}/${pathString}${searchParams ? `?${searchParams}` : ""}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
+
+  try {
+    const response = await fetch(upstreamUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "application/json, text/plain, */*",
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json") && !contentType.includes("text/plain")) {
+      return null;
+    }
+
+    return await response.json();
+  } catch (_err) {
+    clearTimeout(timeoutId);
+    return null;
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -31,40 +65,22 @@ export async function GET(
       return NextResponse.json({ error: "Invalid or unsupported path" }, { status: 400 });
     }
 
-    // Build upstream URL
     const searchParams = request.nextUrl.searchParams.toString();
-    const upstreamUrl = `${OPHIM_BASE_URL}/${pathString}${searchParams ? `?${searchParams}` : ""}`;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    // 1. Try primary upstream
+    let data = await fetchUpstream(OPHIM_BASE_URL, pathString, searchParams);
 
-    const response = await fetch(upstreamUrl, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept: "application/json, text/plain, */*",
-      },
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: `Upstream returned status ${response.status}`, status: response.status },
-        { status: response.status }
-      );
+    // 2. Fallback if primary failed and is different from fallback
+    if (!data && OPHIM_BASE_URL !== FALLBACK_BASE_URL) {
+      data = await fetchUpstream(FALLBACK_BASE_URL, pathString, searchParams);
     }
 
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("application/json") && !contentType.includes("text/plain")) {
+    if (!data) {
       return NextResponse.json(
-        { error: "Invalid upstream content type" },
+        { error: "Failed to fetch from upstream provider" },
         { status: 502 }
       );
     }
-
-    const data = await response.json();
 
     return NextResponse.json(data, {
       status: 200,

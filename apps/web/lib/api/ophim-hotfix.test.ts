@@ -21,7 +21,7 @@ describe("Image Resolver (resolveOPhimImageUrl)", () => {
     const input = "uploads/movies/conan.jpg";
     assert.strictEqual(
       resolveOPhimImageUrl(input),
-      "https://img.ophim.live/uploads/movies/conan.jpg"
+      "https://phimimg.com/uploads/movies/conan.jpg"
     );
   });
 
@@ -29,7 +29,7 @@ describe("Image Resolver (resolveOPhimImageUrl)", () => {
     const input = "uploads/movies/uploads/movies/conan.jpg";
     assert.strictEqual(
       resolveOPhimImageUrl(input),
-      "https://img.ophim.live/uploads/movies/conan.jpg"
+      "https://phimimg.com/uploads/movies/conan.jpg"
     );
   });
 
@@ -37,7 +37,7 @@ describe("Image Resolver (resolveOPhimImageUrl)", () => {
     const input = "doraemon.jpg";
     assert.strictEqual(
       resolveOPhimImageUrl(input),
-      "https://img.ophim.live/uploads/movies/doraemon.jpg"
+      "https://phimimg.com/uploads/movies/doraemon.jpg"
     );
   });
 
@@ -45,7 +45,7 @@ describe("Image Resolver (resolveOPhimImageUrl)", () => {
     const input = "/uploads/movies/naruto.jpg";
     assert.strictEqual(
       resolveOPhimImageUrl(input),
-      "https://img.ophim.live/uploads/movies/naruto.jpg"
+      "https://phimimg.com/uploads/movies/naruto.jpg"
     );
   });
 
