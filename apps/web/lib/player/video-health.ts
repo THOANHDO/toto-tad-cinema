@@ -45,9 +45,10 @@ export function checkVideoHealth(
 
   const hasDimensions = videoWidth > 0 && videoHeight > 0;
   const hasNewFrames = totalVideoFrames > baselineFrames;
+  const hasPlaybackProgress = (video.currentTime > 0 || (video.readyState !== undefined && video.readyState >= 2)) && !video.paused;
 
-  // Healthy if frame callback fired, new frames decoded, or valid dimensions present
-  const isHealthy = hasFrameCallbackFired || hasNewFrames || hasDimensions;
+  // Healthy if frame callback fired, new frames decoded, valid dimensions present, or active playback with data
+  const isHealthy = hasFrameCallbackFired || hasNewFrames || hasDimensions || hasPlaybackProgress;
 
   return {
     isHealthy,
@@ -127,6 +128,8 @@ export class VideoHealthWatchdog {
         );
       }
       this.onErrorCallback?.("audio_only_playback", this.attemptId);
+    } else {
+      this.stop();
     }
   }
 

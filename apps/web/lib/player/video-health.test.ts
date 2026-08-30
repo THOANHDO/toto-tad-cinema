@@ -43,6 +43,32 @@ describe("Video Health Evaluation & Audio-Only Black Video Watchdog", () => {
     assert.equal(status.totalVideoFrames, 45);
   });
 
+  test("4b. currentTime > 0 and not paused returns healthy even on platforms without getVideoPlaybackQuality", () => {
+    const fakeVideo = {
+      videoWidth: 0,
+      videoHeight: 0,
+      currentTime: 1.5,
+      paused: false,
+    } as any;
+
+    const status = checkVideoHealth(fakeVideo);
+    assert.equal(status.isHealthy, true);
+    assert.equal(status.reason, "healthy");
+  });
+
+  test("4c. readyState >= 2 and not paused returns healthy", () => {
+    const fakeVideo = {
+      videoWidth: 0,
+      videoHeight: 0,
+      readyState: 3,
+      paused: false,
+    } as any;
+
+    const status = checkVideoHealth(fakeVideo);
+    assert.equal(status.isHealthy, true);
+    assert.equal(status.reason, "healthy");
+  });
+
   test("5. VideoHealthWatchdog does not trigger error when video is paused", () => {
     const watchdog = new VideoHealthWatchdog();
     let errorTriggered = false;

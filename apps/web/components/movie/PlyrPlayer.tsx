@@ -76,6 +76,11 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
     }
 
     const defaultOptions = {
+      fullscreen: {
+        enabled: true,
+        fallback: true,
+        iosNative: "always",
+      },
       controls: [
         "play-large",
         "play",
@@ -135,6 +140,7 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
       const health = checkVideoHealth(video, baselineFramesRef.current);
       if (health.isHealthy) {
         hasReportedHealthyRef.current = true;
+        watchdogRef.current.stop();
         onVideoHealthy?.(attemptId);
       }
     };
@@ -147,19 +153,33 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
 
       verifyVideoHealth();
 
-      // Start Video Health Watchdog (5.5s timeout)
-      watchdogRef.current.start(
-        video,
-        String(attemptId),
-        (reason) => {
-          cleanup();
-          onError?.(reason, attemptId);
-        },
-        5500
-      );
+      if (!hasReportedHealthyRef.current) {
+        // Start Video Health Watchdog (8s timeout)
+        watchdogRef.current.start(
+          video,
+          String(attemptId),
+          (reason) => {
+            cleanup();
+            onError?.(reason, attemptId);
+          },
+          8000
+        );
+      }
     };
 
     const handleResize = () => {
+      verifyVideoHealth();
+    };
+
+    const handleTimeUpdate = () => {
+      verifyVideoHealth();
+    };
+
+    const handleLoadedData = () => {
+      verifyVideoHealth();
+    };
+
+    const handleCanPlay = () => {
       verifyVideoHealth();
     };
 
@@ -169,6 +189,9 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("resize", handleResize);
     video.addEventListener("waiting", handleWaiting);
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    video.addEventListener("loadeddata", handleLoadedData);
+    video.addEventListener("canplay", handleCanPlay);
 
     const initPlayer = (Constructor: any) => {
       if (!Constructor || !video) return;
@@ -273,6 +296,9 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
       video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("resize", handleResize);
       video.removeEventListener("waiting", handleWaiting);
+      video.removeEventListener("timeupdate", handleTimeUpdate);
+      video.removeEventListener("loadeddata", handleLoadedData);
+      video.removeEventListener("canplay", handleCanPlay);
       cleanup();
       if (cleanupEventListener) cleanupEventListener();
     };

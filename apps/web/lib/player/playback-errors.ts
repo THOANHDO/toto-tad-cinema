@@ -32,8 +32,6 @@ export function isFatalHlsError(data: any): boolean {
   if (
     data.details === "manifestLoadError" ||
     data.details === "manifestParsingError" ||
-    data.details === "fragLoadError" ||
-    data.details === "fragLoadTimeout" ||
     data.details === "keyLoadError"
   ) {
     return true;

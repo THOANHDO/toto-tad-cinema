@@ -389,6 +389,29 @@ img {
   background: transparent !important;
 }
 
+.plyr--fullscreen-fallback {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 99999999 !important;
+  background: #000000 !important;
+  border-radius: 0 !important;
+}
+
+.plyr--fullscreen-fallback video {
+  width: 100vw !important;
+  height: 100vh !important;
+  object-fit: contain !important;
+}
+
+.plyr--fullscreen-active {
+  background: #000000 !important;
+}
+
 .touch-ripple {
   position: absolute;
   z-index: 100;
