@@ -38,8 +38,10 @@ export default function VideoPlayer({
   const searchParams = useSearchParams();
   const initialTime = searchParams.get("t") ? Math.floor(Number(searchParams.get("t"))) : undefined;
 
+  const { updateWatchProgress } = useAccountDataStore();
   const playerRef = useRef<any>(null);
-  const pauseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSyncedTimeRef = useRef<number>(0);
+  const lastSyncTimestampRef = useRef<number>(0);
 
   const {
     activeSource,
@@ -67,53 +69,122 @@ export default function VideoPlayer({
   const hideOverlay = phase === "embed_ready" || phase === "healthy";
 
   // DB watch progress sync
-  const syncToServer = useCallback(async () => {
-    if (!playerRef.current) return;
-    const isSupabaseEnabled = Boolean(
-      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-    if (!isSupabaseEnabled) return;
+  const syncToServer = useCallback(
+    async (forcedTime?: number, forcedDuration?: number) => {
+      const isSupabaseEnabled = Boolean(
+        process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      );
+      if (!isSupabaseEnabled) return;
 
-    const currentTime = Math.floor(playerRef.current.currentTime || 0);
-    const duration = Math.floor(playerRef.current.duration || 0);
+      const player = playerRef.current;
+      const media = player?.media || player;
+      const currentTime = Math.floor(forcedTime ?? player?.currentTime ?? media?.currentTime ?? 0);
+      const duration = Math.floor(forcedDuration ?? player?.duration ?? media?.duration ?? 0);
 
-    if (duration > 0 && currentTime > 0) {
+      if (currentTime <= 0 && duration <= 0) return;
+
+      // Update client state immediately for snappy UI
+      updateWatchProgress(movieSlug, {
+        episode,
+        episodeName: episodeName || `Tập ${episode}`,
+        currentTime,
+        duration,
+        updatedAt: Date.now(),
+      });
+
       try {
         const { updateWatchHistory } = await import("@/app/lich-su/actions");
         await updateWatchHistory({
           movie_slug: movieSlug,
-          movie_title: movieName,
-          poster_url: movieThumb,
+          movie_title: movieName || movieSlug,
+          poster_url: movieThumb || "",
           episode_slug: episode,
-          episode_name: episodeName,
-          duration,
-          playback_time: currentTime,
+          episode_name: episodeName || `Tập ${episode}`,
+          duration: duration || 0,
+          playback_time: currentTime || 0,
         });
+        lastSyncedTimeRef.current = currentTime;
+        lastSyncTimestampRef.current = Date.now();
       } catch (err) {
         console.error("Failed to sync history:", err);
       }
-    }
-  }, [movieSlug, movieName, movieThumb, episode, episodeName]);
+    },
+    [movieSlug, movieName, movieThumb, episode, episodeName, updateWatchProgress]
+  );
 
   const handlePlayerReady = (player: any) => {
     playerRef.current = player;
+    const media = player?.media || player;
 
-    player.media?.addEventListener("pause", () => {
-      pauseTimerRef.current = setTimeout(() => {
-        syncToServer();
-      }, 5000);
-    });
+    const handleTimeUpdate = () => {
+      const curr = Math.floor(player.currentTime || media.currentTime || 0);
+      const dur = Math.floor(player.duration || media.duration || 0);
+      const now = Date.now();
 
-    player.media?.addEventListener("play", () => {
-      if (pauseTimerRef.current) {
-        clearTimeout(pauseTimerRef.current);
-        pauseTimerRef.current = null;
+      // Initial sync right after starting playback (first 2 seconds)
+      if (curr >= 2 && lastSyncedTimeRef.current === 0) {
+        syncToServer(curr, dur);
+        return;
       }
-      if (activeSource) {
-        reportMediaPlaying(activeSource.id, attemptId);
+
+      // Periodic sync every 10 seconds of playback or after 15s elapsed
+      if (
+        (curr > 0 && Math.abs(curr - lastSyncedTimeRef.current) >= 10) ||
+        (lastSyncTimestampRef.current > 0 && now - lastSyncTimestampRef.current >= 15000)
+      ) {
+        syncToServer(curr, dur);
       }
-    });
+    };
+
+    const handleImmediateSync = () => {
+      const curr = Math.floor(player.currentTime || media.currentTime || 0);
+      const dur = Math.floor(player.duration || media.duration || 0);
+      if (curr > 0) {
+        syncToServer(curr, dur);
+      }
+    };
+
+    if (typeof player.on === "function") {
+      player.on("timeupdate", handleTimeUpdate);
+      player.on("pause", handleImmediateSync);
+      player.on("ended", handleImmediateSync);
+      player.on("seeked", handleImmediateSync);
+      player.on("play", () => {
+        if (activeSource) reportMediaPlaying(activeSource.id, attemptId);
+      });
+    } else if (media?.addEventListener) {
+      media.addEventListener("timeupdate", handleTimeUpdate);
+      media.addEventListener("pause", handleImmediateSync);
+      media.addEventListener("ended", handleImmediateSync);
+      media.addEventListener("seeked", handleImmediateSync);
+      media.addEventListener("play", () => {
+        if (activeSource) reportMediaPlaying(activeSource.id, attemptId);
+      });
+    }
   };
+
+  // Sync when navigating away or closing window
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (playerRef.current) {
+        const media = playerRef.current?.media || playerRef.current;
+        const curr = Math.floor(playerRef.current.currentTime || media?.currentTime || 0);
+        const dur = Math.floor(playerRef.current.duration || media?.duration || 0);
+        if (curr > 0) {
+          syncToServer(curr, dur);
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handleBeforeUnload);
+      handleBeforeUnload();
+    };
+  }, [syncToServer]);
 
   // Keyboard hotkeys
   useEffect(() => {
