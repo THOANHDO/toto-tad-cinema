@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { MessageSquare, Send, Trash2, Smile, Reply, X, CornerDownRight } from "lucide-react";
+import { MessageSquare, Trash2, Reply } from "lucide-react";
 import {
   postMovieComment,
   deleteMovieComment,
   getMovieComments,
+  getCommunityAccounts,
   type CommunityCommentItem,
+  type CommunityAccount,
 } from "@/app/bang-xep-hang/actions";
+import MentionTextarea from "./MentionTextarea";
+import CommentContent from "./CommentContent";
 
 interface MovieCommentsProps {
   movieSlug: string;
@@ -17,8 +21,6 @@ interface MovieCommentsProps {
   initialComments?: CommunityCommentItem[];
 }
 
-const QUICK_EMOJIS = ["❤️", "🔥", "🤣", "🍿", "👏", "😭", "👍", "✨"];
-
 export default function MovieComments({
   movieSlug,
   movieTitle,
@@ -27,13 +29,13 @@ export default function MovieComments({
   initialComments = [],
 }: MovieCommentsProps) {
   const [comments, setComments] = useState<CommunityCommentItem[]>(initialComments);
-  const [content, setContent] = useState("");
-  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [accounts, setAccounts] = useState<CommunityAccount[]>([]);
+  const [mainContent, setMainContent] = useState("");
+  const [replyContent, setReplyContent] = useState("");
+  const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Load comments on mount or slug change
   const refreshComments = async () => {
     if (!movieSlug) return;
     try {
@@ -49,15 +51,11 @@ export default function MovieComments({
       setComments(initialComments);
     }
     refreshComments();
+    getCommunityAccounts().then(setAccounts).catch(console.error);
   }, [movieSlug]);
 
-  const handleEmojiClick = (emoji: string) => {
-    setContent((prev) => prev + emoji);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const text = content.trim();
+  const handleMainSubmit = () => {
+    const text = mainContent.trim();
     if (!text) return;
 
     setErrorMsg("");
@@ -67,15 +65,38 @@ export default function MovieComments({
         movie_title: movieTitle,
         poster_url: posterUrl,
         episode_name: episodeName,
-        parent_id: replyingTo?.id || null,
         content: text,
       });
 
       if (res?.error) {
         setErrorMsg(res.error);
       } else {
-        setContent("");
-        setReplyingTo(null);
+        setMainContent("");
+        await refreshComments();
+      }
+    });
+  };
+
+  const handleReplySubmit = (parentId: string) => {
+    const text = replyContent.trim();
+    if (!text) return;
+
+    setErrorMsg("");
+    startTransition(async () => {
+      const res = await postMovieComment({
+        movie_slug: movieSlug,
+        movie_title: movieTitle,
+        poster_url: posterUrl,
+        episode_name: episodeName,
+        parent_id: parentId,
+        content: text,
+      });
+
+      if (res?.error) {
+        setErrorMsg(res.error);
+      } else {
+        setReplyContent("");
+        setActiveReplyId(null);
         await refreshComments();
       }
     });
@@ -88,6 +109,11 @@ export default function MovieComments({
         await refreshComments();
       }
     });
+  };
+
+  const startReply = (targetId: string, authorName: string) => {
+    setActiveReplyId(targetId);
+    setReplyContent(`@${authorName} `);
   };
 
   const formatRelativeTime = (isoString: string) => {
@@ -130,71 +156,20 @@ export default function MovieComments({
         </div>
       </div>
 
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="mt-5 space-y-3">
-        {/* Reply Indicator */}
-        {replyingTo && (
-          <div className="flex items-center justify-between rounded-lg bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs text-primary">
-            <span className="flex items-center gap-1.5 font-medium">
-              <CornerDownRight className="h-3.5 w-3.5" />
-              Đang trả lời <strong>@{replyingTo.name}</strong>
-            </span>
-            <button
-              type="button"
-              onClick={() => setReplyingTo(null)}
-              className="hover:opacity-80 p-0.5"
-              title="Hủy trả lời"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-
-        <div className="relative">
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder={
-              replyingTo
-                ? `Nhập câu trả lời cho @${replyingTo.name}...`
-                : `Bạn thấy bộ phim này thế nào? Chia sẻ cùng mọi người nhé...`
-            }
-            rows={replyingTo ? 2 : 3}
-            maxLength={500}
-            className="w-full resize-none rounded-xl border border-white/10 bg-black/40 p-3.5 text-sm text-white placeholder-white/35 backdrop-blur-sm transition-all focus:border-primary/60 focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
-          />
-        </div>
-
-        {/* Emoji Bar & Submit Button */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="flex items-center gap-1 text-xs text-foreground-muted mr-1">
-              <Smile className="h-3.5 w-3.5" /> Emoji:
-            </span>
-            {QUICK_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => handleEmojiClick(emoji)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-sm transition-colors hover:bg-white/15 hover:scale-110 active:scale-95"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-
-          <button
-            type="submit"
-            disabled={isPending || !content.trim()}
-            className="button-primary min-h-9 gap-1.5 px-4 text-xs font-semibold disabled:opacity-50"
-          >
-            <Send className="h-3.5 w-3.5" />
-            {isPending ? "Đang gửi..." : replyingTo ? "Gửi trả lời" : "Bình luận"}
-          </button>
-        </div>
-
-        {errorMsg && <p className="text-xs text-error">{errorMsg}</p>}
-      </form>
+      {/* Main Top Input Form */}
+      <div className="mt-5">
+        <MentionTextarea
+          value={mainContent}
+          onChange={setMainContent}
+          onSubmit={handleMainSubmit}
+          placeholder="Bạn thấy bộ phim này thế nào? Chia sẻ cùng mọi người nhé (gõ @ để nhắc tên)..."
+          submitLabel="Bình luận"
+          isPending={isPending}
+          accounts={accounts}
+          rows={3}
+        />
+        {errorMsg && <p className="mt-2 text-xs text-error">{errorMsg}</p>}
+      </div>
 
       {/* Comment List */}
       <div className="mt-6 space-y-4">
@@ -202,7 +177,7 @@ export default function MovieComments({
           <div key={comment.id} className="space-y-2.5">
             {/* Top-Level Comment */}
             <div className="group relative flex items-start gap-3 rounded-xl border border-white/6 bg-white/[0.02] p-3.5 transition-colors hover:bg-white/[0.04]">
-              {/* Avatar Initials */}
+              {/* Avatar */}
               <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gradient-to-br from-primary/40 to-primary/90 text-xs font-bold text-white shadow-sm ring-1 ring-white/20">
                 {comment.author_name ? comment.author_name.charAt(0).toUpperCase() : "U"}
               </div>
@@ -224,17 +199,15 @@ export default function MovieComments({
                   </span>
                 </div>
 
-                <p className="mt-1.5 whitespace-pre-wrap break-words text-sm text-foreground-secondary leading-relaxed">
-                  {comment.content}
-                </p>
+                <div className="mt-1.5 text-sm text-foreground-secondary leading-relaxed">
+                  <CommentContent content={comment.content} />
+                </div>
 
-                {/* Reply Action */}
+                {/* Actions */}
                 <div className="mt-2.5 flex items-center gap-4">
                   <button
                     type="button"
-                    onClick={() => {
-                      setReplyingTo({ id: comment.id, name: comment.author_name });
-                    }}
+                    onClick={() => startReply(comment.id, comment.author_name)}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-primary/80 transition-colors hover:text-primary"
                   >
                     <Reply className="h-3 w-3" />
@@ -255,63 +228,95 @@ export default function MovieComments({
               </div>
             </div>
 
+            {/* Inline Reply Input directly below parent comment */}
+            {activeReplyId === comment.id && (
+              <div className="ml-6 sm:ml-10 rounded-xl border border-primary/30 bg-primary/[0.03] p-3 shadow-md">
+                <MentionTextarea
+                  value={replyContent}
+                  onChange={setReplyContent}
+                  onSubmit={() => handleReplySubmit(comment.id)}
+                  onCancel={() => {
+                    setActiveReplyId(null);
+                    setReplyContent("");
+                  }}
+                  placeholder={`Nhập câu trả lời...`}
+                  submitLabel="Gửi trả lời"
+                  isPending={isPending}
+                  accounts={accounts}
+                  rows={2}
+                  autoFocus
+                />
+              </div>
+            )}
+
             {/* Nested Replies (Thread) */}
             {comment.replies && comment.replies.length > 0 && (
               <div className="ml-6 sm:ml-10 space-y-2 border-l-2 border-primary/20 pl-3 sm:pl-4">
                 {comment.replies.map((reply) => (
-                  <div
-                    key={reply.id}
-                    className="group relative flex items-start gap-2.5 rounded-xl border border-white/5 bg-white/[0.015] p-3 transition-colors hover:bg-white/[0.03]"
-                  >
-                    <div className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/40 to-primary/70 text-[10px] font-bold text-white shadow-sm ring-1 ring-white/20">
-                      {reply.author_name ? reply.author_name.charAt(0).toUpperCase() : "U"}
-                    </div>
+                  <div key={reply.id} className="space-y-2">
+                    <div className="group relative flex items-start gap-2.5 rounded-xl border border-white/5 bg-white/[0.015] p-3 transition-colors hover:bg-white/[0.03]">
+                      <div className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/40 to-primary/70 text-[10px] font-bold text-white shadow-sm ring-1 ring-white/20">
+                        {reply.author_name ? reply.author_name.charAt(0).toUpperCase() : "U"}
+                      </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-xs font-bold text-white">
                             {reply.author_name}
                           </span>
-                          {reply.reply_to_name && (
-                            <span className="text-[11px] text-foreground-muted">
-                              trả lời <strong className="text-primary/90 font-semibold">@{reply.reply_to_name}</strong>
-                            </span>
-                          )}
+                          <span className="text-[10px] text-foreground-muted">
+                            {formatRelativeTime(reply.created_at)}
+                          </span>
                         </div>
-                        <span className="text-[10px] text-foreground-muted">
-                          {formatRelativeTime(reply.created_at)}
-                        </span>
-                      </div>
 
-                      <p className="mt-1 whitespace-pre-wrap break-words text-xs text-foreground-secondary leading-relaxed">
-                        {reply.content}
-                      </p>
+                        <div className="mt-1 text-xs text-foreground-secondary leading-relaxed">
+                          <CommentContent content={reply.content} />
+                        </div>
 
-                      <div className="mt-2 flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReplyingTo({ id: comment.id, name: reply.author_name });
-                          }}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-primary/80 hover:text-primary"
-                        >
-                          <Reply className="h-2.5 w-2.5" />
-                          Trả lời
-                        </button>
-
-                        {reply.is_owner && (
+                        <div className="mt-2 flex items-center gap-3">
                           <button
                             type="button"
-                            onClick={() => handleDelete(reply.id)}
-                            className="inline-flex items-center gap-1 text-[11px] text-foreground-muted hover:text-error"
+                            onClick={() => startReply(reply.id, reply.author_name)}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-primary/80 hover:text-primary"
                           >
-                            <Trash2 className="h-2.5 w-2.5" />
-                            Xóa
+                            <Reply className="h-2.5 w-2.5" />
+                            Trả lời
                           </button>
-                        )}
+
+                          {reply.is_owner && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(reply.id)}
+                              className="inline-flex items-center gap-1 text-[11px] text-foreground-muted hover:text-error"
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                              Xóa
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
+
+                    {/* Inline Reply Input below reply */}
+                    {activeReplyId === reply.id && (
+                      <div className="rounded-xl border border-primary/30 bg-primary/[0.03] p-3 shadow-md">
+                        <MentionTextarea
+                          value={replyContent}
+                          onChange={setReplyContent}
+                          onSubmit={() => handleReplySubmit(comment.id)}
+                          onCancel={() => {
+                            setActiveReplyId(null);
+                            setReplyContent("");
+                          }}
+                          placeholder={`Nhập câu trả lời...`}
+                          submitLabel="Gửi trả lời"
+                          isPending={isPending}
+                          accounts={accounts}
+                          rows={2}
+                          autoFocus
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

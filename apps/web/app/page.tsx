@@ -1,13 +1,24 @@
 import HeroBanner from "@/components/movie/HeroBanner";
 import MovieSlider from "@/components/movie/MovieSlider";
 import LazyMovieSection from "@/components/home/LazyMovieSection";
+import FamilyCommunitySection from "@/components/community/FamilyCommunitySection";
 import { fetchHomeInitialData } from "@/lib/api/home-data";
+import {
+  getLeaderboardMovies,
+  getRecentCommunityComments,
+  getCommunityAccounts,
+} from "@/app/bang-xep-hang/actions";
 import { HeroSkeleton } from "@/components/ui/Skeleton";
 
 export const revalidate = 180; // 3 minutes Server Revalidate
 
 export default async function HomePage() {
-  const initialData = await fetchHomeInitialData();
+  const [initialData, leaderboard, recentComments, accounts] = await Promise.all([
+    fetchHomeInitialData(),
+    getLeaderboardMovies(),
+    getRecentCommunityComments(30),
+    getCommunityAccounts(),
+  ]);
 
   if (!initialData.hasInitialData) {
     return (
@@ -44,9 +55,25 @@ export default async function HomePage() {
     <div className="min-h-screen bg-background">
       {heroMovie ? <HeroBanner movie={heroMovie} /> : <HeroSkeleton />}
 
-      <div className="site-container relative z-10 -mt-12 pb-16 md:-mt-8 md:pb-20 lg:-mt-10 xl:-mt-16">
-        {/* Primary Server-rendered Sections */}
-        {primarySections.map(
+      <div className="site-container relative z-10 -mt-12 pb-16 md:-mt-8 md:pb-20 lg:-mt-10 xl:-mt-16 space-y-6">
+        {/* First section: Phim mới */}
+        {primarySections[0]?.movies?.length > 0 && (
+          <MovieSlider
+            title={primarySections[0].title}
+            movies={primarySections[0].movies.slice(0, 12)}
+            href={primarySections[0].href}
+          />
+        )}
+
+        {/* Family Leaderboard & Discussions directly on Home Page */}
+        <FamilyCommunitySection
+          initialLeaderboard={leaderboard}
+          initialComments={recentComments}
+          initialAccounts={accounts}
+        />
+
+        {/* Remaining Primary Server-rendered Sections */}
+        {primarySections.slice(1).map(
           (section) =>
             section.movies.length > 0 && (
               <MovieSlider

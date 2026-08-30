@@ -98,6 +98,32 @@ export async function getLeaderboardMovies(): Promise<LeaderboardMovieItem[]> {
   }
 }
 
+export interface CommunityAccount {
+  user_id: string;
+  display_name: string;
+}
+
+export async function getCommunityAccounts(): Promise<CommunityAccount[]> {
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return [];
+
+  try {
+    const { data: users } = await supabase
+      .from("user_accounts")
+      .select("user_id, display_name")
+      .eq("is_active", true);
+
+    if (!users) return [];
+    return users.map((u) => ({
+      user_id: u.user_id,
+      display_name: u.display_name || "Thành viên",
+    }));
+  } catch (err) {
+    console.error("Failed to fetch community accounts:", err);
+    return [];
+  }
+}
+
 export async function getRecentCommunityComments(limit = 40): Promise<CommunityCommentItem[]> {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return [];
@@ -106,13 +132,12 @@ export async function getRecentCommunityComments(limit = 40): Promise<CommunityC
     const { data: comments, error } = await supabase
       .from("sr_comments")
       .select("id, user_id, parent_id, movie_slug, movie_title, poster_url, episode_name, content, created_at")
-      .order("created_at", { ascending: false })
-      .limit(limit);
+      .order("created_at", { ascending: true })
+      .limit(100);
 
     if (error || !comments) return [];
 
     const userIds = Array.from(new Set(comments.map((c) => c.user_id)));
-    const parentIds = comments.filter((c) => c.parent_id).map((c) => c.parent_id as string);
 
     // Fetch user display names
     const { data: users } = await supabase
@@ -127,31 +152,38 @@ export async function getRecentCommunityComments(limit = 40): Promise<CommunityC
       }
     }
 
-    // Fetch parent comment authors if any
-    const parentUserMap = new Map<string, string>();
-    if (parentIds.length > 0) {
-      const { data: parents } = await supabase
-        .from("sr_comments")
-        .select("id, user_id")
-        .in("id", parentIds);
-
-      if (parents) {
-        for (const p of parents) {
-          const parentAuthor = userMap.get(p.user_id) || "Thành viên";
-          parentUserMap.set(p.id, parentAuthor);
-        }
-      }
-    }
-
     const { data: authData } = await supabase.auth.getUser();
     const currentUserId = authData?.user?.id;
 
-    return comments.map((c) => ({
+    const rawList: CommunityCommentItem[] = comments.map((c) => ({
       ...c,
       author_name: userMap.get(c.user_id) || "Thành viên",
-      reply_to_name: c.parent_id ? parentUserMap.get(c.parent_id) || null : null,
       is_owner: currentUserId ? c.user_id === currentUserId : false,
+      replies: [],
     }));
+
+    const itemMap = new Map<string, CommunityCommentItem>();
+    const rootComments: CommunityCommentItem[] = [];
+
+    for (const item of rawList) {
+      itemMap.set(item.id, item);
+    }
+
+    for (const item of rawList) {
+      if (item.parent_id && itemMap.has(item.parent_id)) {
+        const parent = itemMap.get(item.parent_id)!;
+        item.reply_to_name = parent.author_name;
+        parent.replies = parent.replies || [];
+        parent.replies.push(item);
+      } else {
+        rootComments.push(item);
+      }
+    }
+
+    // Sort newest root comments first
+    rootComments.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    return rootComments.slice(0, limit);
   } catch (err) {
     console.error("Failed to load community comments:", err);
     return [];

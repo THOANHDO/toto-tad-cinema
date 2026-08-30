@@ -39,10 +39,10 @@ const navItems = [
     { name: "Phim Lẻ", href: "/danh-sach/phim-le", icon: Film },
     { name: "Phim Bộ", href: "/danh-sach/phim-bo", icon: Tv },
     { name: "Hoạt Hình", href: "/danh-sach/hoat-hinh", icon: Gamepad2 },
-    { name: "Bảng Xếp Hạng", href: "/bang-xep-hang", icon: Trophy },
 ];
 
 const exploreItems = [
+    { name: "Bảng Xếp Hạng", href: "/bang-xep-hang", icon: Trophy },
     { name: "Phim Vietsub", href: "/danh-sach/phim-vietsub", icon: Languages },
     { name: "Thuyết Minh", href: "/danh-sach/phim-thuyet-minh", icon: Mic2 },
     { name: "Lồng Tiếng", href: "/danh-sach/phim-long-tieng", icon: Volume2 },
