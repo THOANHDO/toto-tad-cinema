@@ -22,12 +22,16 @@ interface PlyrPlayerProps {
   onPlaying?: (attemptId: number) => void;
   onVideoHealthy?: (attemptId: number) => void;
   onWaiting?: () => void;
+  onPipChange?: (isPip: boolean) => void;
   startTime?: number;
 }
 
 export type PlyrPlayerHandle = {
   getInternalPlayer: () => any;
+  getVideoElement: () => HTMLVideoElement | null;
   toggleFullscreen: () => void;
+  togglePip: () => Promise<void>;
+  isPipActive: () => boolean;
 };
 
 function isAppleDevice() {
@@ -49,16 +53,79 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
   const fragErrorCountRef = useRef(0);
   const baselineFramesRef = useRef(0);
 
-  const { options, source, hlsUrl, sourceId = "hls", attemptId, onReady, onError, onPlaying, onVideoHealthy, onWaiting, startTime } = props;
+  const {
+    options,
+    source,
+    hlsUrl,
+    sourceId = "hls",
+    attemptId,
+    onReady,
+    onError,
+    onPlaying,
+    onVideoHealthy,
+    onWaiting,
+    onPipChange,
+    startTime,
+  } = props;
 
   useImperativeHandle(ref, () => ({
     getInternalPlayer: () => playerRef.current,
+    getVideoElement: () => videoRef.current,
+    isPipActive: () => {
+      if (typeof document !== "undefined" && document.pictureInPictureElement) {
+        return document.pictureInPictureElement === videoRef.current;
+      }
+      const video = videoRef.current as any;
+      if (video && video.webkitPresentationMode) {
+        return video.webkitPresentationMode === "picture-in-picture";
+      }
+      return playerRef.current?.pip === true;
+    },
     toggleFullscreen: () => {
       const video = videoRef.current;
       if (video && typeof (video as any).webkitEnterFullscreen === "function" && isAppleDevice()) {
         (video as any).webkitEnterFullscreen();
       } else if (playerRef.current?.fullscreen) {
         playerRef.current.fullscreen.toggle();
+      }
+    },
+    togglePip: async () => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      try {
+        // Standard HTML5 PiP exit if already active
+        if (typeof document !== "undefined" && document.pictureInPictureElement) {
+          if (document.pictureInPictureElement === video) {
+            await document.exitPictureInPicture();
+            return;
+          }
+          await document.exitPictureInPicture();
+        }
+
+        // WebKit (Safari on macOS / iOS / iPadOS)
+        if (
+          typeof (video as any).webkitSetPresentationMode === "function" &&
+          (video as any).webkitPresentationMode !== undefined
+        ) {
+          const currentMode = (video as any).webkitPresentationMode;
+          const targetMode = currentMode === "picture-in-picture" ? "inline" : "picture-in-picture";
+          (video as any).webkitSetPresentationMode(targetMode);
+          return;
+        }
+
+        // Standard HTML5 PiP request
+        if (typeof document !== "undefined" && document.pictureInPictureEnabled && video.requestPictureInPicture) {
+          await video.requestPictureInPicture();
+          return;
+        }
+
+        // Fallback Plyr pip
+        if (playerRef.current?.pip !== undefined) {
+          playerRef.current.pip = !playerRef.current.pip;
+        }
+      } catch (err) {
+        console.warn("[PlyrPlayer] Không thể chuyển chế độ Picture-in-Picture:", err);
       }
     },
   }));
@@ -210,6 +277,26 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
       }
     };
 
+    const handleEnterPip = () => {
+      onPipChange?.(true);
+    };
+
+    const handleLeavePip = () => {
+      onPipChange?.(false);
+    };
+
+    const handleWebkitPresentationModeChanged = () => {
+      const mode = (video as any).webkitPresentationMode;
+      onPipChange?.(mode === "picture-in-picture");
+    };
+
+    // Enable Auto Picture-in-Picture on supporting browsers (Chromium)
+    if ("autoPictureInPicture" in video) {
+      try {
+        (video as any).autoPictureInPicture = true;
+      } catch (_e) {}
+    }
+
     video.addEventListener("error", handleNativeVideoError);
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("resize", handleResize);
@@ -219,6 +306,9 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
     video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("webkitbeginfullscreen", handleWebkitBeginFullscreen);
     video.addEventListener("webkitendfullscreen", handleWebkitEndFullscreen);
+    video.addEventListener("enterpictureinpicture", handleEnterPip);
+    video.addEventListener("leavepictureinpicture", handleLeavePip);
+    video.addEventListener("webkitpresentationmodechanged", handleWebkitPresentationModeChanged);
 
     const initPlayer = (Constructor: any) => {
       if (!Constructor || !video) return;
@@ -363,6 +453,9 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
       video.removeEventListener("canplay", handleCanPlay);
       video.removeEventListener("webkitbeginfullscreen", handleWebkitBeginFullscreen);
       video.removeEventListener("webkitendfullscreen", handleWebkitEndFullscreen);
+      video.removeEventListener("enterpictureinpicture", handleEnterPip);
+      video.removeEventListener("leavepictureinpicture", handleLeavePip);
+      video.removeEventListener("webkitpresentationmodechanged", handleWebkitPresentationModeChanged);
       cleanup();
       if (cleanupEventListener) cleanupEventListener();
     };
@@ -374,7 +467,11 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
         ref={videoRef}
         className="plyr-react block h-full w-full object-contain"
         playsInline
-        {...{ "webkit-playsinline": "true" }}
+        {...{
+          "webkit-playsinline": "true",
+          "autopictureinpicture": "true",
+          "x-webkit-airplay": "allow",
+        }}
       />
     </div>
   );

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, Server, AlertCircle } from "lucide-react";
+import { ChevronRight, Server, AlertCircle, PictureInPicture2, Minimize2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccountDataStore } from "@/lib/store/useAccountDataStore";
 import dynamic from "next/dynamic";
 import type { SourceInventory } from "@/lib/player/source-inventory";
+import type { PlyrPlayerHandle } from "@/components/movie/PlyrPlayer";
 import { usePlayerStateMachine } from "@/hooks/usePlayerStateMachine";
 
 const PlyrPlayer = dynamic(() => import("@/components/movie/PlyrPlayer"), { ssr: false });
@@ -40,8 +41,22 @@ export default function VideoPlayer({
 
   const { updateWatchProgress } = useAccountDataStore();
   const playerRef = useRef<any>(null);
+  const plyrHandleRef = useRef<PlyrPlayerHandle | null>(null);
   const lastSyncedTimeRef = useRef<number>(0);
   const lastSyncTimestampRef = useRef<number>(0);
+  const [isPipActive, setIsPipActive] = useState(false);
+  const [isPipSupported, setIsPipSupported] = useState(true);
+
+  // Check PiP support on mount
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      const supported =
+        Boolean(document.pictureInPictureEnabled) ||
+        Boolean((window as any).documentPictureInPicture) ||
+        (typeof navigator !== "undefined" && /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent));
+      setIsPipSupported(supported);
+    }
+  }, []);
 
   const {
     activeSource,
@@ -67,6 +82,38 @@ export default function VideoPlayer({
   const isEmbed = activeSource?.kind === "embed";
   const isFailed = phase === "failed" || !activeSource;
   const hideOverlay = phase === "embed_ready" || phase === "healthy";
+
+  // Toggle Picture-in-Picture mode
+  const togglePip = useCallback(async () => {
+    if (plyrHandleRef.current) {
+      await plyrHandleRef.current.togglePip();
+      return;
+    }
+
+    const player = playerRef.current;
+    const video = (player?.media || player) as HTMLVideoElement | undefined;
+    if (!video) return;
+
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (
+        typeof (video as any).webkitSetPresentationMode === "function" &&
+        (video as any).webkitPresentationMode !== undefined
+      ) {
+        const currentMode = (video as any).webkitPresentationMode;
+        (video as any).webkitSetPresentationMode(
+          currentMode === "picture-in-picture" ? "inline" : "picture-in-picture"
+        );
+      } else if (video.requestPictureInPicture && document.pictureInPictureEnabled) {
+        await video.requestPictureInPicture();
+      } else if (player?.pip !== undefined) {
+        player.pip = !player.pip;
+      }
+    } catch (err) {
+      console.warn("[VideoPlayer] PiP toggle failed:", err);
+    }
+  }, []);
 
   // DB watch progress sync
   const syncToServer = useCallback(
@@ -186,6 +233,98 @@ export default function VideoPlayer({
     };
   }, [syncToServer]);
 
+  // Media Session API integration for OS/Mobile lockscreen and background controls
+  useEffect(() => {
+    if (typeof window === "undefined" || !("mediaSession" in navigator)) return;
+
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: `${movieName} - ${episodeName || `Tập ${episode}`}`,
+        artist: "TAD Cinema",
+        album: movieName,
+        artwork: movieThumb
+          ? [
+              { src: movieThumb, sizes: "96x96", type: "image/jpeg" },
+              { src: movieThumb, sizes: "128x128", type: "image/jpeg" },
+              { src: movieThumb, sizes: "192x192", type: "image/jpeg" },
+              { src: movieThumb, sizes: "256x256", type: "image/jpeg" },
+              { src: movieThumb, sizes: "384x384", type: "image/jpeg" },
+              { src: movieThumb, sizes: "512x512", type: "image/jpeg" },
+            ]
+          : [],
+      });
+
+      navigator.mediaSession.setActionHandler("play", () => {
+        playerRef.current?.play?.();
+      });
+
+      navigator.mediaSession.setActionHandler("pause", () => {
+        playerRef.current?.pause?.();
+      });
+
+      navigator.mediaSession.setActionHandler("seekbackward", (details) => {
+        const skip = details.seekOffset || 10;
+        const player = playerRef.current;
+        if (player) {
+          if (typeof player.rewind === "function") player.rewind(skip);
+          else if (player.currentTime !== undefined) player.currentTime = Math.max(0, player.currentTime - skip);
+        }
+      });
+
+      navigator.mediaSession.setActionHandler("seekforward", (details) => {
+        const skip = details.seekOffset || 10;
+        const player = playerRef.current;
+        if (player) {
+          if (typeof player.forward === "function") player.forward(skip);
+          else if (player.currentTime !== undefined) player.currentTime = player.currentTime + skip;
+        }
+      });
+
+      if (prevEpisodeSlug) {
+        navigator.mediaSession.setActionHandler("previoustrack", () => {
+          router.push(
+            `/xem-phim/${movieSlug}/${prevEpisodeSlug}${
+              requestedServerIndex !== undefined ? `?sv=${requestedServerIndex}` : ""
+            }`
+          );
+        });
+      } else {
+        navigator.mediaSession.setActionHandler("previoustrack", null);
+      }
+
+      if (nextEpisodeSlug) {
+        navigator.mediaSession.setActionHandler("nexttrack", () => {
+          router.push(
+            `/xem-phim/${movieSlug}/${nextEpisodeSlug}${
+              requestedServerIndex !== undefined ? `?sv=${requestedServerIndex}` : ""
+            }`
+          );
+        });
+      } else {
+        navigator.mediaSession.setActionHandler("nexttrack", null);
+      }
+
+      try {
+        (navigator.mediaSession as any).setActionHandler("enterpictureinpicture", () => {
+          togglePip();
+        });
+      } catch (_e) {}
+    } catch (err) {
+      console.warn("[MediaSession] Setup warning:", err);
+    }
+  }, [
+    movieName,
+    episodeName,
+    episode,
+    movieThumb,
+    movieSlug,
+    prevEpisodeSlug,
+    nextEpisodeSlug,
+    requestedServerIndex,
+    router,
+    togglePip,
+  ]);
+
   // Keyboard hotkeys
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -237,11 +376,16 @@ export default function VideoPlayer({
           e.preventDefault();
           if (playerRef.current) playerRef.current.fullscreen?.toggle();
           break;
+        case "p":
+        case "P":
+          e.preventDefault();
+          togglePip();
+          break;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [nextEpisodeSlug, prevEpisodeSlug, movieSlug, requestedServerIndex, router]);
+  }, [nextEpisodeSlug, prevEpisodeSlug, movieSlug, requestedServerIndex, router, togglePip]);
 
   return (
     <div className="relative">
@@ -265,6 +409,38 @@ export default function VideoPlayer({
                   {statusMessage}
                 </p>
               )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Picture-in-Picture Active Overlay */}
+        <AnimatePresence>
+          {isPipActive && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/90 p-6 text-center backdrop-blur-md"
+            >
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/30">
+                <PictureInPicture2 className="h-7 w-7 animate-pulse" />
+              </div>
+              <h3 className="text-base font-bold text-white sm:text-lg">
+                Phim đang chiếu ở cửa sổ nổi ngoài màn hình
+              </h3>
+              <p className="max-w-md text-xs leading-relaxed text-foreground-muted sm:text-sm">
+                Bạn có thể mở ứng dụng khác (Zalo, Word, Facebook, làm việc...) mà phim vẫn phát liên tục.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={togglePip}
+                  className="button-primary gap-2 px-4 py-2 text-xs font-semibold"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                  Quay lại màn hình chính
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -293,6 +469,7 @@ export default function VideoPlayer({
             /* HLS Plyr mode - ONLY PLYR PLAYER RENDERED */
             <div className="h-full w-full">
               <PlyrPlayer
+                ref={plyrHandleRef}
                 key={`${activeSource.id}-${attemptId}`}
                 sourceId={activeSource.id}
                 attemptId={attemptId}
@@ -302,6 +479,7 @@ export default function VideoPlayer({
                 onPlaying={() => reportMediaPlaying(activeSource.id, attemptId)}
                 onVideoHealthy={() => reportVideoHealthy(activeSource.id, attemptId)}
                 onWaiting={() => reportBuffering()}
+                onPipChange={setIsPipActive}
                 onError={(reason) => reportSourceError(activeSource.id, attemptId, reason)}
               />
             </div>
@@ -345,49 +523,73 @@ export default function VideoPlayer({
         )}
       </div>
 
-      {/* Manual Server Selector Bar */}
+      {/* Manual Server Selector & Quick Actions Bar */}
       <div className="mt-4 surface-panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs font-medium text-foreground-muted">
-            <Server className="h-4 w-4 text-primary" />
-            <span>Chọn máy chủ phát:</span>
-          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-foreground-muted">
+              <Server className="h-4 w-4 text-primary" />
+              <span>Chọn máy chủ phát:</span>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {inventory.sources.map((src, idx) => {
-              const isActive = activeIndex === idx;
-              const isFailedSrc = failedSourceIds.includes(src.id);
+            <div className="flex flex-wrap items-center gap-2">
+              {inventory.sources.map((src, idx) => {
+                const isActive = activeIndex === idx;
+                const isFailedSrc = failedSourceIds.includes(src.id);
 
-              return (
-                <button
-                  key={src.id}
-                  type="button"
-                  onClick={() => selectSource(src.id)}
-                  className={`relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    isActive
-                      ? "bg-primary text-white shadow-md shadow-primary/20 ring-1 ring-primary"
-                      : isFailedSrc
-                      ? "border border-error/30 bg-error/10 text-error/80 hover:border-error/50"
-                      : "border border-white/10 bg-white/5 text-foreground-secondary hover:border-white/20 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  <span
-                    className={`h-2 w-2 rounded-full ${
+                return (
+                  <button
+                    key={src.id}
+                    type="button"
+                    onClick={() => selectSource(src.id)}
+                    className={`relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                       isActive
-                        ? "bg-white animate-pulse"
+                        ? "bg-primary text-white shadow-md shadow-primary/20 ring-1 ring-primary"
                         : isFailedSrc
-                        ? "bg-error"
-                        : "bg-success"
+                        ? "border border-error/30 bg-error/10 text-error/80 hover:border-error/50"
+                        : "border border-white/10 bg-white/5 text-foreground-secondary hover:border-white/20 hover:bg-white/10 hover:text-white"
                     }`}
-                  />
-                  <span>{src.label}</span>
-                  <span className="text-[10px] opacity-75 uppercase">
-                    ({src.kind})
-                  </span>
-                </button>
-              );
-            })}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        isActive
+                          ? "bg-white animate-pulse"
+                          : isFailedSrc
+                          ? "bg-error"
+                          : "bg-success"
+                      }`}
+                    />
+                    <span>{src.label}</span>
+                    <span className="text-[10px] opacity-75 uppercase">
+                      ({src.kind})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Quick Action: Picture-in-Picture Button */}
+          {isPipSupported && !isEmbed && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={togglePip}
+                title="Xem phim ở cửa sổ nổi ngoài màn hình để vừa làm việc vừa xem (Phím tắt: P)"
+                className={`relative inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  isPipActive
+                    ? "bg-primary text-white shadow-md shadow-primary/25 ring-1 ring-primary"
+                    : "border border-primary/30 bg-primary/10 text-primary hover:border-primary/60 hover:bg-primary/20"
+                }`}
+              >
+                <PictureInPicture2 className="h-4 w-4 flex-none" />
+                <span>{isPipActive ? "Đang xem ngoài màn hình" : "Xem ngoài màn hình"}</span>
+                <span className="hidden rounded bg-black/30 px-1.5 py-0.5 text-[10px] font-mono text-white/80 sm:inline-block">
+                  P
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
