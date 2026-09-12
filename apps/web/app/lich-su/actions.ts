@@ -1,12 +1,14 @@
 "use server";
 
-import { requireActiveAccount } from "@/lib/auth/server";
+import { getCurrentAccount, requireActiveAccount } from "@/lib/auth/server";
 import { createServerSupabaseClient } from "@repo/database/server";
 import { revalidatePath } from "next/cache";
 import { watchHistorySchema, type WatchHistoryInput } from "./schema";
 
 export async function updateWatchHistory(historyData: WatchHistoryInput) {
-  const { user } = await requireActiveAccount("/lich-su");
+  const account = await getCurrentAccount();
+  if (!account || !account.is_active) return { error: "unauthenticated" };
+
   const validated = watchHistorySchema.safeParse(historyData);
   if (!validated.success) return { error: "Dữ liệu lịch sử không hợp lệ" };
 
@@ -15,7 +17,7 @@ export async function updateWatchHistory(historyData: WatchHistoryInput) {
 
   const { error } = await supabase.from("sr_watch_history").upsert(
     {
-      user_id: user.id,
+      user_id: account.user_id,
       movie_slug: validated.data.movie_slug,
       movie_title: validated.data.movie_title,
       poster_url: validated.data.poster_url,
@@ -35,14 +37,16 @@ export async function updateWatchHistory(historyData: WatchHistoryInput) {
 }
 
 export async function getWatchHistory() {
-  const { user } = await requireActiveAccount("/lich-su");
+  const account = await getCurrentAccount();
+  if (!account || !account.is_active) return [];
+
   const supabase = await createServerSupabaseClient();
   if (!supabase) return [];
 
   const { data, error } = await supabase
     .from("sr_watch_history")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", account.user_id)
     .order("updated_at", { ascending: false });
 
   return error ? [] : data ?? [];

@@ -115,31 +115,49 @@ export default function VideoPlayer({
     }
   }, []);
 
+  // Safely extract playback currentTime and duration without throwing if player/media is destroyed
+  const getSafePlaybackTime = useCallback((player: any): { currentTime: number; duration: number } => {
+    if (!player) return { currentTime: 0, duration: 0 };
+    try {
+      const media = player.media || (player instanceof HTMLMediaElement ? player : null);
+      if (!media) return { currentTime: 0, duration: 0 };
+      const rawCur = media.currentTime;
+      const rawDur = media.duration;
+      const curr = Number.isFinite(rawCur) ? Math.floor(rawCur) : 0;
+      const dur = Number.isFinite(rawDur) ? Math.floor(rawDur) : 0;
+      return {
+        currentTime: Math.max(0, curr),
+        duration: Math.max(0, dur),
+      };
+    } catch {
+      return { currentTime: 0, duration: 0 };
+    }
+  }, []);
+
   // DB watch progress sync
   const syncToServer = useCallback(
     async (forcedTime?: number, forcedDuration?: number) => {
-      const isSupabaseEnabled = Boolean(
-        process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      );
-      if (!isSupabaseEnabled) return;
-
-      const player = playerRef.current;
-      const media = player?.media || player;
-      const currentTime = Math.floor(forcedTime ?? player?.currentTime ?? media?.currentTime ?? 0);
-      const duration = Math.floor(forcedDuration ?? player?.duration ?? media?.duration ?? 0);
-
-      if (currentTime <= 0 && duration <= 0) return;
-
-      // Update client state immediately for snappy UI
-      updateWatchProgress(movieSlug, {
-        episode,
-        episodeName: episodeName || `Tập ${episode}`,
-        currentTime,
-        duration,
-        updatedAt: Date.now(),
-      });
-
       try {
+        const isSupabaseEnabled = Boolean(
+          process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        );
+        if (!isSupabaseEnabled) return;
+
+        const { currentTime: safeTime, duration: safeDur } = getSafePlaybackTime(playerRef.current);
+        const currentTime = Math.floor(forcedTime ?? safeTime ?? 0);
+        const duration = Math.floor(forcedDuration ?? safeDur ?? 0);
+
+        if (currentTime <= 0 && duration <= 0) return;
+
+        // Update client state immediately for snappy UI
+        updateWatchProgress(movieSlug, {
+          episode,
+          episodeName: episodeName || `Tập ${episode}`,
+          currentTime,
+          duration,
+          updatedAt: Date.now(),
+        });
+
         const { updateWatchHistory } = await import("@/app/lich-su/actions");
         await updateWatchHistory({
           movie_slug: movieSlug,
@@ -153,10 +171,10 @@ export default function VideoPlayer({
         lastSyncedTimeRef.current = currentTime;
         lastSyncTimestampRef.current = Date.now();
       } catch (err) {
-        console.error("Failed to sync history:", err);
+        console.warn("[VideoPlayer] History sync warning:", err);
       }
     },
-    [movieSlug, movieName, movieThumb, episode, episodeName, updateWatchProgress]
+    [movieSlug, movieName, movieThumb, episode, episodeName, updateWatchProgress, getSafePlaybackTime]
   );
 
   const handlePlayerReady = (player: any) => {
@@ -164,8 +182,7 @@ export default function VideoPlayer({
     const media = player?.media || player;
 
     const handleTimeUpdate = () => {
-      const curr = Math.floor(player.currentTime || media.currentTime || 0);
-      const dur = Math.floor(player.duration || media.duration || 0);
+      const { currentTime: curr, duration: dur } = getSafePlaybackTime(playerRef.current);
       const now = Date.now();
 
       // Initial sync right after starting playback (first 2 seconds)
@@ -184,8 +201,7 @@ export default function VideoPlayer({
     };
 
     const handleImmediateSync = () => {
-      const curr = Math.floor(player.currentTime || media.currentTime || 0);
-      const dur = Math.floor(player.duration || media.duration || 0);
+      const { currentTime: curr, duration: dur } = getSafePlaybackTime(playerRef.current);
       if (curr > 0) {
         syncToServer(curr, dur);
       }
@@ -199,12 +215,18 @@ export default function VideoPlayer({
       player.on("play", () => {
         if (activeSource) reportMediaPlaying(activeSource.id, attemptId);
       });
+      player.on("playing", () => {
+        if (activeSource) reportMediaPlaying(activeSource.id, attemptId);
+      });
     } else if (media?.addEventListener) {
       media.addEventListener("timeupdate", handleTimeUpdate);
       media.addEventListener("pause", handleImmediateSync);
       media.addEventListener("ended", handleImmediateSync);
       media.addEventListener("seeked", handleImmediateSync);
       media.addEventListener("play", () => {
+        if (activeSource) reportMediaPlaying(activeSource.id, attemptId);
+      });
+      media.addEventListener("playing", () => {
         if (activeSource) reportMediaPlaying(activeSource.id, attemptId);
       });
     }
@@ -214,9 +236,7 @@ export default function VideoPlayer({
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (playerRef.current) {
-        const media = playerRef.current?.media || playerRef.current;
-        const curr = Math.floor(playerRef.current.currentTime || media?.currentTime || 0);
-        const dur = Math.floor(playerRef.current.duration || media?.duration || 0);
+        const { currentTime: curr, duration: dur } = getSafePlaybackTime(playerRef.current);
         if (curr > 0) {
           syncToServer(curr, dur);
         }
@@ -231,7 +251,7 @@ export default function VideoPlayer({
       window.removeEventListener("pagehide", handleBeforeUnload);
       handleBeforeUnload();
     };
-  }, [syncToServer]);
+  }, [syncToServer, getSafePlaybackTime]);
 
   // Media Session API integration for OS/Mobile lockscreen and background controls
   useEffect(() => {
@@ -329,24 +349,43 @@ export default function VideoPlayer({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const player = playerRef.current;
+      const media = player?.media || (player instanceof HTMLMediaElement ? player : null);
+
       switch (e.key) {
         case " ":
         case "k":
           e.preventDefault();
-          if (playerRef.current) {
-            if (playerRef.current.paused) playerRef.current.play();
-            else playerRef.current.pause();
+          if (media) {
+            try {
+              if (media.paused) player?.play ? player.play() : media.play?.();
+              else player?.pause ? player.pause() : media.pause?.();
+            } catch (_e) {}
           }
           break;
         case "ArrowLeft":
         case "j":
           e.preventDefault();
-          if (playerRef.current) playerRef.current.rewind(10);
+          if (player) {
+            try {
+              if (typeof player.rewind === "function") player.rewind(10);
+              else if (media && Number.isFinite(media.currentTime)) {
+                media.currentTime = Math.max(0, media.currentTime - 10);
+              }
+            } catch (_e) {}
+          }
           break;
         case "ArrowRight":
         case "l":
           e.preventDefault();
-          if (playerRef.current) playerRef.current.forward(10);
+          if (player) {
+            try {
+              if (typeof player.forward === "function") player.forward(10);
+              else if (media && Number.isFinite(media.currentTime)) {
+                media.currentTime = media.currentTime + 10;
+              }
+            } catch (_e) {}
+          }
           break;
         case "ArrowUp":
           if (nextEpisodeSlug) {
@@ -370,11 +409,19 @@ export default function VideoPlayer({
           break;
         case "m":
           e.preventDefault();
-          if (playerRef.current) playerRef.current.muted = !playerRef.current.muted;
+          if (media) {
+            try {
+              media.muted = !media.muted;
+            } catch (_e) {}
+          }
           break;
         case "f":
           e.preventDefault();
-          if (playerRef.current) playerRef.current.fullscreen?.toggle();
+          if (player) {
+            try {
+              player.fullscreen?.toggle();
+            } catch (_e) {}
+          }
           break;
         case "p":
         case "P":
@@ -476,6 +523,9 @@ export default function VideoPlayer({
                 hlsUrl={activeSource.url}
                 startTime={savedTime || initialTime}
                 onReady={handlePlayerReady}
+                onDestroy={() => {
+                  playerRef.current = null;
+                }}
                 onPlaying={() => reportMediaPlaying(activeSource.id, attemptId)}
                 onVideoHealthy={() => reportVideoHealthy(activeSource.id, attemptId)}
                 onWaiting={() => reportBuffering()}

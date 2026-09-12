@@ -1,6 +1,6 @@
 "use server";
 
-import { requireActiveAccount } from "@/lib/auth/server";
+import { getCurrentAccount, requireActiveAccount } from "@/lib/auth/server";
 import { createServerSupabaseClient } from "@repo/database/server";
 import { revalidatePath } from "next/cache";
 import { favoriteSchema, type FavoriteInput } from "./schema";
@@ -75,28 +75,32 @@ export async function clearAllFavorites() {
 }
 
 export async function getFavorites() {
-  const { user } = await requireActiveAccount("/yeu-thich");
+  const account = await getCurrentAccount();
+  if (!account || !account.is_active) return [];
+
   const supabase = await createServerSupabaseClient();
   if (!supabase) return [];
 
   const { data, error } = await supabase
     .from("sr_favorites")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", account.user_id)
     .order("created_at", { ascending: false });
 
   return error ? [] : data ?? [];
 }
 
 export async function getFavoriteSlugs() {
-  const { user } = await requireActiveAccount("/yeu-thich");
+  const account = await getCurrentAccount();
+  if (!account || !account.is_active) return [];
+
   const supabase = await createServerSupabaseClient();
   if (!supabase) return [];
 
   const { data, error } = await supabase
     .from("sr_favorites")
     .select("movie_slug")
-    .eq("user_id", user.id);
+    .eq("user_id", account.user_id);
 
   if (error) return [];
   return data?.map((favorite: { movie_slug: string }) => favorite.movie_slug) ?? [];

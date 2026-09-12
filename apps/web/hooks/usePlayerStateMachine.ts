@@ -87,7 +87,8 @@ export function controllerReducer(state: ControllerState, action: ControllerActi
 
       return {
         ...state,
-        phase: "media_playing",
+        phase: state.phase === "switching" ? "healthy" : "media_playing",
+        statusMessage: "",
       };
     }
 

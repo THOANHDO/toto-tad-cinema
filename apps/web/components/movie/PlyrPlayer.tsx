@@ -18,6 +18,7 @@ interface PlyrPlayerProps {
   sourceId?: string;
   attemptId: number;
   onReady?: (player: any) => void;
+  onDestroy?: () => void;
   onError?: (reason: string, attemptId: number) => void;
   onPlaying?: (attemptId: number) => void;
   onVideoHealthy?: (attemptId: number) => void;
@@ -60,6 +61,7 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
     sourceId = "hls",
     attemptId,
     onReady,
+    onDestroy,
     onError,
     onPlaying,
     onVideoHealthy,
@@ -180,20 +182,26 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
 
     const cleanup = () => {
       watchdogRef.current.stop();
+
+      // 1. First remove all event listeners to prevent events from firing during tear-down
       if (video) {
         try {
-          video.muted = true;
-          video.pause();
-          video.removeAttribute("src");
-          video.load();
+          video.removeEventListener("error", handleNativeVideoError);
+          video.removeEventListener("playing", handlePlaying);
+          video.removeEventListener("resize", handleResize);
+          video.removeEventListener("waiting", handleWaiting);
+          video.removeEventListener("timeupdate", handleTimeUpdate);
+          video.removeEventListener("loadeddata", handleLoadedData);
+          video.removeEventListener("canplay", handleCanPlay);
+          video.removeEventListener("webkitbeginfullscreen", handleWebkitBeginFullscreen);
+          video.removeEventListener("webkitendfullscreen", handleWebkitEndFullscreen);
+          video.removeEventListener("enterpictureinpicture", handleEnterPip);
+          video.removeEventListener("leavepictureinpicture", handleLeavePip);
+          video.removeEventListener("webkitpresentationmodechanged", handleWebkitPresentationModeChanged);
         } catch (_e) {}
       }
-      if (playerRef.current) {
-        try {
-          playerRef.current.destroy();
-        } catch (_e) {}
-        playerRef.current = null;
-      }
+
+      // 2. Detach and destroy HLS before Plyr
       if (hlsRef.current) {
         try {
           hlsRef.current.stopLoad();
@@ -201,6 +209,26 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
           hlsRef.current.destroy();
         } catch (_e) {}
         hlsRef.current = null;
+      }
+
+      // 3. Destroy Plyr instance safely
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch (_e) {}
+        playerRef.current = null;
+      }
+
+      // 4. Notify parent that player is destroyed
+      onDestroy?.();
+
+      // 5. Reset video element cleanly
+      if (video) {
+        try {
+          video.pause();
+          video.removeAttribute("src");
+          video.load();
+        } catch (_e) {}
       }
     };
 
@@ -222,9 +250,10 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
     };
 
     const handlePlaying = () => {
+      // Always notify controller that media is actively playing to clear buffering timers
+      onPlaying?.(attemptId);
       if (!hasLoggedPlayingRef.current) {
         hasLoggedPlayingRef.current = true;
-        onPlaying?.(attemptId);
       }
 
       verifyVideoHealth();
@@ -249,6 +278,10 @@ export const PlyrPlayer = forwardRef<PlyrPlayerHandle, PlyrPlayerProps>((props, 
 
     const handleTimeUpdate = () => {
       verifyVideoHealth();
+      // If currentTime is actively moving, video is not stalled
+      if (video.currentTime > 0 && !video.paused) {
+        onPlaying?.(attemptId);
+      }
     };
 
     const handleLoadedData = () => {

@@ -9,7 +9,7 @@ export type PlaybackState =
   | "failed";
 
 export const STARTUP_TIMEOUT_MS = 14000; // 14s startup timeout before failing over
-export const BUFFERING_TIMEOUT_MS = 15000; // 15s persistent stall timeout before failing over
+export const BUFFERING_TIMEOUT_MS = 25000; // 25s persistent stall timeout before failing over
 
 /**
  * Classifies if a HTML5 <video> media error is fatal.
