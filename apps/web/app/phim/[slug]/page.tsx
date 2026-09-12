@@ -4,11 +4,12 @@ import { use, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Calendar, Clock, Eye, Globe2, Play, Users2 } from "lucide-react";
-import { getMovieDetail, getImageUrl } from "@/lib/api/ophim";
+import { AlertCircle, Calendar, Clock, Eye, Globe2, Play, Users2 } from "lucide-react";
+import { getMovieDetail, getImageUrl, searchPhimApi } from "@/lib/api/ophim";
 import { getDefaultWatchEpisode } from "@/lib/player/watch-helpers";
 import FavoriteButton from "./FavoriteButton";
 import EpisodeList from "./EpisodeList";
+import MovieCard from "@/components/movie/MovieCard";
 import MovieComments from "@/components/community/MovieComments";
 import { getMovieComments, type CommunityCommentItem } from "@/app/bang-xep-hang/actions";
 import { useMovieData } from "@/lib/hooks/use-movie-data";
@@ -20,6 +21,7 @@ interface Props {
 export default function MovieDetailPage({ params }: Props) {
     const { slug } = use(params);
     const [comments, setComments] = useState<CommunityCommentItem[]>([]);
+    const [alternatives, setAlternatives] = useState<any[]>([]);
 
     useEffect(() => {
         getMovieComments(slug).then(setComments);
@@ -29,6 +31,28 @@ export default function MovieDetailPage({ params }: Props) {
         `movie-detail-${slug}`,
         () => getMovieDetail(slug)
     );
+
+    const movie = data?.movie;
+    const episodes = data?.episodes || movie?.episodes || [];
+    const hasValidEpisodes = episodes.some((server: any) =>
+        (server?.server_data || server?.items || []).some(
+            (ep: any) => Boolean((ep?.slug || "").trim() && (ep?.name || "").trim())
+        )
+    );
+
+    useEffect(() => {
+        if (!loading && movie && !hasValidEpisodes) {
+            const query = movie.name || movie.origin_name || slug;
+            searchPhimApi(query)
+                .then((items) => {
+                    if (Array.isArray(items)) {
+                        const filtered = items.filter((m: any) => m.slug !== slug);
+                        setAlternatives(filtered.slice(0, 6));
+                    }
+                })
+                .catch(() => {});
+        }
+    }, [loading, movie, hasValidEpisodes, slug]);
 
     if (loading) {
         return (
@@ -49,9 +73,6 @@ export default function MovieDetailPage({ params }: Props) {
     if (!data || !data.movie) {
         notFound();
     }
-
-    const movie = data.movie;
-    const episodes = data.episodes || movie.episodes || [];
 
     return (
         <div className="min-h-screen bg-background">
@@ -145,33 +166,55 @@ export default function MovieDetailPage({ params }: Props) {
                             </div>
                         )}
 
-                        <div className="mt-7 flex flex-wrap items-center justify-center gap-3 md:justify-start">
+                        <div className="mt-7">
                             {(() => {
                                 const defaultEp = getDefaultWatchEpisode(episodes);
                                 if (defaultEp && defaultEp.slug) {
                                     return (
-                                        <Link
-                                            href={`/xem-phim/${movie.slug}/${defaultEp.slug}`}
-                                            prefetch={false}
-                                            className="button-primary min-w-36"
-                                        >
-                                            <Play className="h-4 w-4 fill-current" />
-                                            Xem phim
-                                        </Link>
+                                        <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
+                                            <Link
+                                                href={`/xem-phim/${movie.slug}/${defaultEp.slug}`}
+                                                prefetch={false}
+                                                className="button-primary min-w-36"
+                                            >
+                                                <Play className="h-4 w-4 fill-current" />
+                                                Xem phim
+                                            </Link>
+                                            <FavoriteButton movie={movie} />
+                                        </div>
                                     );
                                 }
                                 return (
-                                    <button
-                                        type="button"
-                                        disabled
-                                        className="button-secondary min-w-36 cursor-not-allowed opacity-50"
-                                    >
-                                        <Play className="h-4 w-4" />
-                                        Chưa có nguồn phát
-                                    </button>
+                                    <div className="space-y-3">
+                                        <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
+                                            <button
+                                                type="button"
+                                                disabled
+                                                className="button-secondary min-w-36 cursor-not-allowed opacity-60"
+                                            >
+                                                <Play className="h-4 w-4" />
+                                                Chưa có nguồn phát
+                                            </button>
+                                            <FavoriteButton movie={movie} />
+                                        </div>
+                                        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3.5 max-w-xl text-left">
+                                            <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
+                                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                                Bản phim đang chờ cập nhật nguồn phát
+                                            </div>
+                                            <p className="mt-1.5 text-xs leading-relaxed text-amber-200/80">
+                                                Dữ liệu từ máy chủ phim hiện chưa có liên kết phát trực tuyến cho bản ghi này. Bạn có thể chọn xem các phiên bản cùng tên có sẵn dưới đây hoặc{" "}
+                                                <Link
+                                                    href={`/tim-kiem?q=${encodeURIComponent(movie.name || slug)}`}
+                                                    className="font-semibold text-white underline underline-offset-2 hover:text-amber-300"
+                                                >
+                                                    tìm kiếm phiên bản khác tại đây
+                                                </Link>.
+                                            </p>
+                                        </div>
+                                    </div>
                                 );
                             })()}
-                            <FavoriteButton movie={movie} />
                         </div>
                     </div>
                 </div>
@@ -180,14 +223,23 @@ export default function MovieDetailPage({ params }: Props) {
                     <section className="surface-panel p-5 sm:p-7 md:p-8">
                         <p className="eyebrow">Giới thiệu</p>
                         <h2 className="mt-2 text-2xl font-bold tracking-tight text-white">Nội dung phim</h2>
-                        {movie.content ? (
-                            <div
-                                className="mt-5 text-sm leading-7 text-foreground-secondary md:text-base md:leading-8"
-                                dangerouslySetInnerHTML={{ __html: movie.content }}
-                            />
-                        ) : (
-                            <p className="mt-5 text-foreground-muted">Nội dung đang được cập nhật.</p>
-                        )}
+                        {(() => {
+                            const rawContent = (movie.content || "").replace(/<[^>]*>/g, "").trim();
+                            const isPlaceholder = !rawContent || rawContent === "Phim chưa có nội dung.";
+                            if (isPlaceholder) {
+                                return (
+                                    <p className="mt-5 text-foreground-muted italic">
+                                        Nội dung phim đang được cập nhật từ nhà phát hành.
+                                    </p>
+                                );
+                            }
+                            return (
+                                <div
+                                    className="mt-5 text-sm leading-7 text-foreground-secondary md:text-base md:leading-8"
+                                    dangerouslySetInnerHTML={{ __html: movie.content }}
+                                />
+                            );
+                        })()}
                     </section>
 
                     <aside className="surface-panel p-5 sm:p-7">
@@ -220,7 +272,7 @@ export default function MovieDetailPage({ params }: Props) {
                     </aside>
                 </div>
 
-                {episodes.length > 0 && (
+                {hasValidEpisodes ? (
                     <section className="surface-panel mt-8 p-5 sm:p-7 md:p-8">
                         <div className="mb-6">
                             <p className="eyebrow">Phát trực tuyến</p>
@@ -228,7 +280,24 @@ export default function MovieDetailPage({ params }: Props) {
                         </div>
                         <EpisodeList episodes={episodes} movieSlug={movie.slug} />
                     </section>
-                )}
+                ) : alternatives.length > 0 ? (
+                    <section className="surface-panel mt-8 p-5 sm:p-7 md:p-8">
+                        <div className="mb-6">
+                            <p className="eyebrow">Gợi ý phim liên quan</p>
+                            <h2 className="mt-2 text-2xl font-bold tracking-tight text-white">
+                                Các phiên bản có sẵn nguồn phát
+                            </h2>
+                            <p className="mt-1 text-sm text-foreground-muted">
+                                Bản phim này chưa có file video trên máy chủ nguồn. Bạn có thể xem ngay các phiên bản cùng tên hoặc liên quan dưới đây:
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                            {alternatives.map((altMovie, idx) => (
+                                <MovieCard key={altMovie._id || altMovie.slug} movie={altMovie} index={idx} showProgress={false} />
+                            ))}
+                        </div>
+                    </section>
+                ) : null}
 
                 <div className="mt-8">
                     <MovieComments
