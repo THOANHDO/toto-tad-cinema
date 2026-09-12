@@ -62,6 +62,25 @@ export default function RootLayout({
     <html lang="vi" className="dark">
       <head>
         <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== "undefined") {
+                window.addEventListener("unhandledrejection", function(event) {
+                  var reason = event.reason;
+                  var msg = reason && (reason.message || String(reason));
+                  var stack = reason && (reason.stack || "");
+                  if (
+                    (msg && (msg.indexOf("M_ID") !== -1 || msg.indexOf("200.js") !== -1)) ||
+                    (stack && (stack.indexOf("200.js") !== -1 || stack.indexOf("M_ID") !== -1))
+                  ) {
+                    event.preventDefault();
+                  }
+                });
+              }
+            `,
+          }}
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
